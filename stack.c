@@ -30,7 +30,7 @@ void push(volatile stack_t * stack, node_t * item) {
     expected = *stack;
     new_stack.age = expected.age + 1;
     new_stack.head = item;
-    item->next = expected.head;
+    item->next = (struct node_t *) expected.head;
   } while(!__sync_bool_compare_and_swap(&stack->combined,
                                          expected.combined,
                                          new_stack.combined));
