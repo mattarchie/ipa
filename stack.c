@@ -15,17 +15,23 @@ node_t * pop(volatile stack_t * stack) {
       stack_t new_stack;
       new_stack.age = expected.age + 1;
       new_stack.head = (node_t *) expected.head->next;
-      if (__sync_bool_compare_and_swap(&stack->combined, expected.combined, new_stack.combined)) {
+      if (__sync_bool_compare_and_swap(&stack->combined,
+                                        expected.combined,
+                                        new_stack.combined)) {
         return expected.head;
       }
     }
   }
 }
 
-void push(stack_t * stack, node_t * item) {
-  node_t * prev;
+void push(volatile stack_t * stack, node_t * item) {
+  stack_t new_stack, expected;
   do {
-    prev = (node_t *) stack->head;
-    item->next = (struct node_t *) prev;
-  } while(!__sync_bool_compare_and_swap(&stack->head, prev, item));
+    expected = *stack;
+    new_stack.age = expected.age + 1;
+    new_stack.head = item;
+    item->next = expected.head;
+  } while(!__sync_bool_compare_and_swap(&stack->combined,
+                                         expected.combined,
+                                         new_stack.combined));
 }
