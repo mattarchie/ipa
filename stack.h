@@ -1,19 +1,27 @@
 #ifndef ___NOOMR_STACK_H
-#include <stdint.h>
+#define ___NOOMR_STACK_H
 #include <stdlib.h>
+#include <stdint.h>
+
+#if __SIZEOF_POINTER__ == 8
+// 64b pointers
+#define combined_stack_t unsigned __int128
+#define stack_age_t uint64_t
+#else
+#define combined_stack_t uint64_t
+#define stack_age_t uint32_t
+#endif
 
 typedef struct {
   struct node_t * next;
 } node_t;
 
-typedef struct {
-  union {
-    struct {
-      uint64_t age;
-      node_t * head;
-    };
-    __int128 combined;
+typedef union {
+  struct {
+    node_t * head;
+    stack_age_t age;
   };
+  combined_stack_t combined;
 } stack_t;
 
 
