@@ -2,6 +2,7 @@
 #define ___NOOMR_STACK_H
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 #if __SIZEOF_POINTER__ == 8
 // 64b pointers
@@ -30,5 +31,7 @@ stack_t * new_stack(void);
 node_t * pop(volatile stack_t *);
 
 void push(volatile stack_t *, node_t *);
+
+bool empty(volatile stack_t *);
 
 #endif

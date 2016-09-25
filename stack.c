@@ -35,3 +35,7 @@ void push(volatile stack_t * stack, node_t * item) {
                                          expected.combined,
                                          new_stack.combined));
 }
+
+bool empty(volatile stack_t * stack) {
+  return stack->head == NULL;
+}

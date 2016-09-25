@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include "stack.h"
 
 typedef struct  {
@@ -12,10 +13,11 @@ data_node_t * alloc_node(int data) {
   node->data = data;
   return node;
 }
+const int elements = 5;
 
+bool found[elements] = {false};
 
 int main() {
-  const int elements = 5;
   int index, errors = 0;
   node_t * empty_stack;
   stack_t * stack = new_stack();
