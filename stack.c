@@ -6,9 +6,10 @@ stack_t * new_stack() {
   return calloc(1, sizeof(stack_t));
 }
 
+
 node_t * pop(volatile stack_t * stack) {
   while (true) {
-    stack_t expected = *stack;
+    stack_t expected = atomic_stack_load(stack);
     if (expected.head == NULL) {
       return NULL;
     } else {
@@ -27,7 +28,7 @@ node_t * pop(volatile stack_t * stack) {
 void push(volatile stack_t * stack, node_t * item) {
   stack_t new_stack, expected;
   do {
-    expected = *stack;
+    expected = atomic_stack_load(stack);
     new_stack.age = expected.age + 1;
     new_stack.head = item;
     item->next = (struct node_t *) expected.head;
