@@ -37,12 +37,21 @@ bool empty(volatile stack_t *);
 inline stack_t atomic_stack_load(volatile stack_t * stack) {
   stack_t loaded;
   do {
-    loaded.age = stack->age;
-    loaded.head = stack->head;
+    loaded = *stack;
   } while(!__sync_bool_compare_and_swap(&stack->combined,
                                         loaded.combined,
                                         loaded.combined));
   return loaded;
+}
+// The function below can be used as a more light-weight 'semi-atomic' load without spinning
+//Loading the variable used to prevent the ABA problem first is suffient -- read barrier to prevent proc. reordering
+inline stack_t naba_load(volatile stack_t * stack) {
+  stack_t load;
+  load.age = stack->age;
+  __sync_synchronize(); // Need a barrier -- really only read but no good GCC binding
+  load.head = stack->head;
+  return load;
+
 }
 
 #endif
