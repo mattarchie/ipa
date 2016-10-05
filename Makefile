@@ -1,9 +1,9 @@
 CC = gcc
 INCFLAGS = -I./
-CFLAGS = -O3 -ggdb3 -ggdb -g  -Wall -Wno-unused-function -march=native $(INCFLAGS) -D NOOMR_ALIGN_HEADERS -D COLLECT_STATS -pthread
+CFLAGS = -O3 -ggdb3 -ggdb -g -ffast-math -Wall -Wno-unused-function -march=native $(INCFLAGS) -D NOOMR_ALIGN_HEADERS -D COLLECT_STATS -pthread
 TEST_BINARIES = tests/stack_test
 OBJECTS = stack.o noomr.o
-
+LDFLAGS = -lm
 
 default: $(OBJECTS)
 

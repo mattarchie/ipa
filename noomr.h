@@ -10,7 +10,7 @@
 #define NUM_CLASSES (16)
 #define SIZE_OFFSET (5)
 #define CLASS_TO_SIZE(x) (1 << ((x) + SIZE_OFFSET)) // to actually be determined later
-#define SIZE_TO_CLASS(x) ((size_t) (log2(x)))
+#define SIZE_TO_CLASS(x) ((size_t) (log2((x) - SIZE_OFFSET)))
 #define MAX_SIZE CLASS_TO_SIZE(((NUM_CLASSES) - 1))
 
 #if __WORDSIZE == 64
