@@ -87,12 +87,15 @@ typedef struct {
   volatile unsigned allocs_per_class[NUM_CLASSES];
   volatile line_int_t huge_allocations;
 #endif
-  stack_t seq_free[NUM_CLASSES];
-  stack_t spec_free[NUM_CLASSES];
-  size_t base; //where segment begins (cached)
+  stack_t seq_free[NUM_CLASSES]; // sequential free list
+  stack_t spec_free[NUM_CLASSES]; // speculative free list
+  size_t base; //where segment begins (cache)
   volatile size_t spec_growth; // grow (B) done by spec group
-  volatile unsigned header_num; // next anon file to use
-  volatile header_page_t * firstpg;
+  volatile unsigned header_num; // next header file to use
+  volatile unsigned large_num; // next file for large allocation
+  volatile header_page_t * firstpg; // the address of the first header mmap page
+  volatile void * first_huge; // where the next large page should be allocated
+  volatile size_t number_mmap; // how many pages where mmaped (headers & large)
 } shared_data_t;
 
 // Function prototypes
@@ -100,5 +103,20 @@ typedef struct {
 // If compiled with the approiate flags, print the stats collected
 // during run time
 void print_noomr_stats(void);
+
+// Utility functions
+static inline block_t * getblock(void * user_payload) {
+  return (block_t *) (((char*) user_payload) - sizeof(block_t));
+}
+
+static inline void * getpayload(block_t * block) {
+  return (void *) (((char*) block) + sizeof(block_t));
+}
+
+static inline size_t align(size_t value, size_t alignment) {
+  return (((value) + (alignment-1)) & ~(alignment-1));
+}
+#define MIN(a,b) ((a) < (b) ? (a) : (b))
+#define MAX(a,b) ((a) > (b) ? (a) : (b))
 
 #endif

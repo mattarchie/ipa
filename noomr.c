@@ -23,14 +23,6 @@ static inline bool out_of_range(void * payload) {
     payload >= (void *) (((char*)shared->base) + shared->spec_growth);
 }
 
-static inline block_t * getblock(void * user_payload) {
-  return (block_t *) (((char*) user_payload) - sizeof(block_t));
-}
-
-static inline void * getpayload(block_t * block) {
-  return (void *) (((char*) block) + sizeof(block_t));
-}
-
 static inline header_t * lookup_header(void * user_payload) {
   return out_of_range(user_payload) ? NULL : getblock(user_payload)->header;
 }
@@ -83,7 +75,7 @@ static inline size_t noomr_usable_space(void * payload) {
  into all process's private address space
  To solve this, promise all spec-growth regions
 */
-static header_page_t * lastheaderpg() {
+inline header_page_t * lastheaderpg() {
   volatile header_page_t * page = shared->firstpg;
   if (page == NULL) {
     return NULL;
@@ -107,18 +99,14 @@ static inline void map_headers(char * begin, size_t block_size, size_t num_block
   header_page_t * page;
   assert(block_size == ALIGN(block_size));
   for (i = 0; i < num_blocks; i++) {
-    // passing the non-atomic conditional ensures that no more than
-    // HEADERS_PER_PAGE allocations will go to this header page
-    map_block: while ((page = lastheaderpg()) == NULL ||
-            page->next_free >= (HEADERS_PER_PAGE - 1)) {
-      allocate_header_page();
-    }
-    header_index = __sync_add_and_fetch(&page->next_free, 1);
-    // for now, sanity check to make sure header index is still in bounds
-    // I do not believe that this
-    if (header_index >= HEADERS_PER_PAGE) {
-      goto map_block;
-    }
+    do {
+      while( (page = lastheaderpg()) == NULL ||
+        page->next_free >= (HEADERS_PER_PAGE - 1)) {
+          allocate_header_page();
+        }
+        header_index = __sync_add_and_fetch(&page->next_free, 1);
+    } while(header_index >= (HEADERS_PER_PAGE - 1));
+
     page->headers[header_index].size = block_size;
     // mmaped pages are padded with zeros, set NULL anyways
     page->headers[header_index].spec_next.next = NULL;
@@ -191,6 +179,7 @@ void * noomr_malloc(size_t size) {
 void noomr_free(void * payload) {
   if (out_of_range(payload)) {
     // A huge block is unmapped directly to kernel
+    // This can be done immediately -- there is no re-allocation conflicts
     block_t * block = getblock(payload);
     munmap(block, block->huge_block_sz + sizeof(block_t));
   } else {
