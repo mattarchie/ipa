@@ -23,7 +23,9 @@ int create_header_pg(int file_no) {
   }
   int fd = open(path, O_RDWR | O_CREAT | O_SYNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
   // need to truncate (grow -- poor naming) the file
-  ftruncate(fd, PAGE_SIZE);
+  if (ftruncate(fd, PAGE_SIZE) < 0) {
+    perror("Unable to truncate/grow file");
+  }
   return fd;
 }
 
