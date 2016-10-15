@@ -105,11 +105,11 @@ typedef struct {
 void print_noomr_stats(void);
 
 // Utility functions
-static inline block_t * getblock(void * user_payload) {
+inline block_t * getblock(void * user_payload) {
   return (block_t *) (((char*) user_payload) - sizeof(block_t));
 }
 
-static inline void * getpayload(block_t * block) {
+inline void * getpayload(block_t * block) {
   return (void *) (((char*) block) + sizeof(block_t));
 }
 

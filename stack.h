@@ -32,9 +32,16 @@ node_t * pop(volatile stack_t *);
 
 void push(volatile stack_t *, node_t *);
 
-bool empty(volatile stack_t *);
+static inline bool empty(volatile stack_t * stack) {
+  return stack->head == NULL;
+}
 
-inline stack_t atomic_stack_load(volatile stack_t * stack) {
+static inline void init_stack(stack_t * stack) {
+  stack->head = NULL;
+  stack->age = 0;
+}
+
+static inline stack_t atomic_stack_load(volatile stack_t * stack) {
   stack_t loaded;
   do {
     loaded = *stack;

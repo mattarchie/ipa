@@ -4,6 +4,7 @@
 #include <assert.h>
 #include <unistd.h>
 #include <sys/mman.h>
+#include <string.h>
 #include "noomr.h"
 #include "memmap.h"
 #include "stack.h"
@@ -18,7 +19,7 @@ inline bool speculating(void) {
   return true; //TODO implement
 }
 
-static inline bool out_of_range(void * payload) {
+inline bool out_of_range(void * payload) {
   return payload < (void*) shared->base ||
     payload >= (void *) (((char*)shared->base) + shared->spec_growth);
 }
@@ -65,8 +66,12 @@ static header_page_t * payload_to_header_page(void * payload) {
   }
 }
 
-static inline size_t noomr_usable_space(void * payload) {
-  return getblock(payload)->header->size;
+inline size_t noomr_usable_space(void * payload) {
+  if (out_of_range(payload)) {
+    return getblock(payload)->huge_block_sz;
+  } else {
+    return getblock(payload)->header->size;
+  }
 }
 
 
@@ -181,7 +186,7 @@ void noomr_free(void * payload) {
     // A huge block is unmapped directly to kernel
     // This can be done immediately -- there is no re-allocation conflicts
     block_t * block = getblock(payload);
-    munmap(block, block->huge_block_sz + sizeof(block_t));
+    munmap(block, (block->huge_block_sz & ~ALIGNMENT) + sizeof(block_t));
   } else {
     // TODO do I need to delay the free while speculating?
     //  there is no overwrite issue
@@ -192,6 +197,11 @@ void noomr_free(void * payload) {
   }
 }
 
+void * noomr_calloc(size_t nmemb, size_t size) {
+  void * payload = noomr_malloc(nmemb * size);
+  memset(payload, 0, noomr_usable_space(payload));
+  return payload;
+}
 
 void print_noomr_stats() {
 #ifdef COLLECT_STATS
