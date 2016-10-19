@@ -1,3 +1,5 @@
 stack_test
 test_allocate
 override
+stack_parallel_test
+test_free

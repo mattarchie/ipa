@@ -13,9 +13,9 @@ data_node_t * alloc_node(int data) {
   node->data = data;
   return node;
 }
-const int elements = 5;
+#define elements 5
 
-bool found[elements] = {false};
+int elements_found[elements] = {0};
 
 int main() {
   int index, errors = 0;
