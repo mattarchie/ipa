@@ -78,14 +78,16 @@ size_t noomr_usable_space(void * payload) {
  To solve this, promise all spec-growth regions
 */
 header_page_t * lastheaderpg() {
-  volatile header_page_t * page = shared->firstpg;
-  if (page == NULL) {
+  static header_page_t * cache = NULL;
+  volatile header_page_t * page;
+  if (shared->firstpg == NULL) {
     return NULL;
   }
+  page = cache == NULL ? shared->firstpg : (volatile header_page_t *) cache;
   for (; page->next != NULL; page = (header_page_t *) page->next) {
     ;
   }
-  return (header_page_t *) page;
+  return cache = (header_page_t *) page;
 }
 
 static void map_headers(char * begin, size_t block_size, size_t num_blocks) {
