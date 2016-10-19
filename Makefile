@@ -2,7 +2,7 @@ CC = gcc
 INCFLAGS = -I./
 DEFS = -D NOOMR_ALIGN_HEADERS -D COLLECT_STATS -D NOOMR_SYSTEM_ALLOC
 CFLAGS = -O0 -fno-inline -pg -ggdb3 -ggdb -g -fPIC -ffast-math -Wall -Wno-unused-function -march=native $(INCFLAGS)
-TEST_BINARIES = tests/test_allocate tests/stack_test
+TEST_BINARIES = tests/stack_test tests/test_allocate
 OBJECTS = noomr.o memmap.o
 LDFLAGS = -Wl,--no-as-needed -ldl -lm
 
@@ -18,7 +18,7 @@ tests/%:
 	$(CC) $(CFLAGS) $? -o $@ $(LDFLAGS)
 
 test: $(TEST_BINARIES)
-	@$(foreach tb, $?, echo ./$(tb) && ./$(tb); )
+	@$(foreach tb, $?, echo ./$(tb) && ./$(tb) )
 
 clean:
 	rm -f tests/*.o $(TEST_BINARIES) $(OBJECTS)
