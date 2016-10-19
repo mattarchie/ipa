@@ -71,7 +71,10 @@ typedef struct {
 
 typedef union {
   header_t * header;
-  size_t huge_block_sz; //Note: this includes the block_t space
+  struct {
+    size_t huge_block_sz; //Note: this includes the block_t space
+    void * next_block;
+  };
 } block_t;
 
 
@@ -94,7 +97,7 @@ typedef struct {
   volatile unsigned header_num; // next header file to use
   volatile unsigned large_num; // next file for large allocation
   volatile header_page_t * firstpg; // the address of the first header mmap page
-  volatile void * first_huge; // where the next large page should be allocated
+  volatile block_t * large_block; // pointer into the list of large blocks
   volatile size_t number_mmap; // how many pages where mmaped (headers & large)
 } shared_data_t;
 
