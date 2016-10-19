@@ -15,21 +15,19 @@
 shared_data_t * shared;
 size_t my_growth;
 
-inline bool speculating(void) {
-  return true; //TODO implement
-}
+extern bool speculating(void);
 
-inline bool out_of_range(void * payload) {
+bool out_of_range(void * payload) {
   return payload < (void*) shared->base ||
     payload >= (void *) (((char*)shared->base) + shared->spec_growth);
 }
 
-static inline header_t * lookup_header(void * user_payload) {
+static header_t * lookup_header(void * user_payload) {
   return out_of_range(user_payload) ? NULL : getblock(user_payload)->header;
 }
 
 static inline stack_t * get_stack_of_size(size_t size) {
-  size_t class = SIZE_TO_CLASS(ALIGN(size));
+  size_t class = SIZE_TO_CLASS(size);
   return speculating() ? &shared->spec_free[class] : &shared->seq_free[class];
 }
 
@@ -66,11 +64,11 @@ static header_page_t * payload_to_header_page(void * payload) {
   }
 }
 
-inline size_t noomr_usable_space(void * payload) {
+size_t noomr_usable_space(void * payload) {
   if (out_of_range(payload)) {
     return getblock(payload)->huge_block_sz;
   } else {
-    return getblock(payload)->header->size;
+    return getblock(payload)->header->size - sizeof(block_t);
   }
 }
 
@@ -88,15 +86,17 @@ header_page_t * lastheaderpg() {
   for (; page->next != NULL; page = (header_page_t *) page->next) {
     ;
   }
-  assert(page != NULL);
   return (header_page_t *) page;
 }
 
-static inline void map_headers(char * begin, size_t block_size, size_t num_blocks) {
+static void map_headers(char * begin, size_t block_size, size_t num_blocks) {
   size_t i, header_index;
   header_page_t * page;
+  size_t index = SIZE_TO_CLASS(block_size) - 1;
+  stack_t * spec_stack = &shared->spec_free[index];
+  stack_t * seq_stack = &shared->seq_free[index];
   assert(block_size == ALIGN(block_size));
-  for (i = 0; i < num_blocks; i++) {
+  for (i = 0; i < num_blocks - 1; i++) {
     do {
       while( (page = lastheaderpg()) == NULL ||
         page->next_free >= (HEADERS_PER_PAGE - 1)) {
@@ -104,15 +104,18 @@ static inline void map_headers(char * begin, size_t block_size, size_t num_block
         }
         header_index = __sync_add_and_fetch(&page->next_free, 1);
     } while(header_index >= (HEADERS_PER_PAGE - 1));
+      block_t * block = (block_t *) (&begin[i * block_size]);
 
     page->headers[header_index].size = block_size;
     // mmaped pages are padded with zeros, set NULL anyways
     page->headers[header_index].spec_next.next = NULL;
     page->headers[header_index].seq_next.next = NULL;
-    __sync_synchronize(); // mem fence
-    // get the i-block
-    block_t * block = (block_t *) (&begin[i * (block_size + sizeof(block_t))]);
     block->header = &page->headers[header_index];
+    page->headers[header_index].payload = getpayload(block);
+    __sync_synchronize(); // mem fence
+    push(seq_stack, &page->headers[header_index].seq_next);
+    push(spec_stack, &page->headers[header_index].spec_next);
+    // get the i-block
   }
 }
 
@@ -120,15 +123,13 @@ static void grow(unsigned klass) {
   size_t size = CLASS_TO_SIZE(klass);
   size_t blocks = max(1024 / size, 5);
   size_t my_region_size = size * blocks;
-  size_t growth_bytes = size * blocks;
   if (speculating()) {
-    growth_bytes = __sync_add_and_fetch(&shared->spec_growth, my_region_size) - my_growth;
+    // first allocate the extra space that's needed
+    sbrk(__sync_add_and_fetch(&shared->spec_growth, my_region_size) - my_growth);
     __sync_add_and_fetch(&my_growth, size * blocks);
   }
-  // perform the grow operation
-  // TODO whiteboard & figure out if need a -1
-  char * end = sbrk(growth_bytes);
-  char * base = end - my_region_size;
+  // Grow the heap by the space needed for my allocations
+  char * base = sbrk(my_region_size);
   // now map headers for my new (private) address region
   map_headers(base, size, blocks);
 }
@@ -143,9 +144,10 @@ void endspec() {
 }
 
 void noomr_init() {
-  shared = mmap(NULL, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, -1, 0);
+  shared = mmap(NULL, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
   bzero(shared, PAGE_SIZE);
   shared->number_mmap = 1;
+  shared->base = (size_t) sbrk(0); // get the starting address
 }
 
 #define container_of(ptr, type, member) ({ \
@@ -157,11 +159,23 @@ static inline header_t * convert_head_mode_aware(node_t * node) {
                          container_of(node, header_t, seq_next);
 }
 
+size_t stack_for_size(size_t min_size) {
+  size_t klass;
+  for (klass = 1; CLASS_TO_SIZE(klass) < min_size && klass < NUM_CLASSES; klass++) {
+    ;
+  }
+  if (klass >= NUM_CLASSES) {
+    return -1;
+  }
+  return CLASS_TO_SIZE(klass);
+}
+
 void * noomr_malloc(size_t size) {
   header_t * header;
   stack_t * stack;
   node_t * stack_node;
   size_t aligned = ALIGN(size);
+  size_t stack_size = stack_for_size(aligned);
   if (shared == NULL) {
     noomr_init();
   }
@@ -174,7 +188,7 @@ void * noomr_malloc(size_t size) {
     alloc: stack = get_stack_of_size(aligned);
     stack_node = pop(stack);
     if (! stack_node) {
-      grow(SIZE_TO_CLASS(aligned));
+      grow(SIZE_TO_CLASS(stack_size));
       goto alloc;
     }
     header = convert_head_mode_aware(stack_node);
@@ -218,3 +232,22 @@ void print_noomr_stats() {
   }
 #endif
 }
+
+
+#ifdef NOOMR_SYSTEM_ALLOC
+void * malloc(size_t t) {
+  return noomr_malloc(t);
+}
+void free(void * p) {
+  noomr_free(p);
+}
+void malloc_usable_size(void * p) {
+  return noomr_usable_space(p);
+}
+void realloc(void * p, size_t size) {
+  return NULL; //TODO implement noomr version
+}
+void calloc(size_t a, size_t b) {
+  return noomr_calloc(a, b);
+}
+#endif

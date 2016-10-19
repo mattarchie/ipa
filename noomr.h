@@ -10,7 +10,7 @@
 #define NUM_CLASSES (16)
 #define SIZE_OFFSET (5)
 #define CLASS_TO_SIZE(x) (1 << ((x) + SIZE_OFFSET)) // to actually be determined later
-#define SIZE_TO_CLASS(x) ((size_t) (log2((x) - SIZE_OFFSET)))
+#define SIZE_TO_CLASS(x) ((size_t) x >> (SIZE_OFFSET + 1))
 #define MAX_SIZE CLASS_TO_SIZE(((NUM_CLASSES) - 1))
 
 #if __WORDSIZE == 64
@@ -105,15 +105,15 @@ typedef struct {
 void print_noomr_stats(void);
 
 // Utility functions
-inline block_t * getblock(void * user_payload) {
+static block_t * getblock(void * user_payload) {
   return (block_t *) (((char*) user_payload) - sizeof(block_t));
 }
 
-inline void * getpayload(block_t * block) {
+static void * getpayload(block_t * block) {
   return (void *) (((char*) block) + sizeof(block_t));
 }
 
-static inline size_t align(size_t value, size_t alignment) {
+static size_t align(size_t value, size_t alignment) {
   return (((value) + (alignment-1)) & ~(alignment-1));
 }
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
