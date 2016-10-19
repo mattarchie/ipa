@@ -26,12 +26,6 @@ typedef union {
 } stack_t;
 
 
-stack_t * new_stack(void);
-
-node_t * pop(volatile stack_t *);
-
-void push(volatile stack_t *, node_t *);
-
 static inline bool empty(volatile stack_t * stack) {
   return stack->head == NULL;
 }
@@ -59,6 +53,41 @@ static inline stack_t naba_load(volatile stack_t * stack) {
   load.head = stack->head;
   return load;
 
+}
+
+static inline void push(volatile stack_t * stack, node_t * item) {
+  stack_t new_stack, expected;
+  do {
+    expected = naba_load(stack);
+    new_stack.age = expected.age + 1;
+    new_stack.head = item;
+    item->next = (struct node_t *) expected.head;
+  } while(!__sync_bool_compare_and_swap(&stack->combined,
+                                         expected.combined,
+                                         new_stack.combined));
+}
+
+static inline node_t * pop(volatile stack_t * stack) {
+  while (true) {
+    stack_t expected = *stack;
+    if (expected.head == NULL) {
+      return NULL;
+    } else {
+      stack_t new_stack;
+      new_stack.age = expected.age + 1;
+      __sync_synchronize(); //More fine-grain than the naba load -- let the 1 happen 'whenever'
+      new_stack.head = (node_t *) expected.head->next;
+      if (__sync_bool_compare_and_swap(&stack->combined,
+                                        expected.combined,
+                                        new_stack.combined)) {
+        return expected.head;
+      }
+    }
+  }
+}
+
+static inline stack_t * new_stack() {
+  return calloc(1, sizeof(stack_t));
 }
 
 #endif

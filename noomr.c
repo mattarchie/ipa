@@ -142,6 +142,12 @@ void endspec() {
   promote_list();
 }
 
+void noomr_init() {
+  shared = mmap(NULL, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, -1, 0);
+  bzero(shared, PAGE_SIZE);
+  shared->number_mmap = 1;
+}
+
 #define container_of(ptr, type, member) ({ \
                 const typeof( ((type *)0)->member ) *__mptr = (ptr); \
                 (type *)( (char *)__mptr - __builtin_offsetof(type,member) );})
@@ -156,6 +162,9 @@ void * noomr_malloc(size_t size) {
   stack_t * stack;
   node_t * stack_node;
   size_t aligned = ALIGN(size);
+  if (shared == NULL) {
+    noomr_init();
+  }
 #ifdef COLLECT_STATS
   __sync_add_and_fetch(&shared->allocations, 1);
 #endif

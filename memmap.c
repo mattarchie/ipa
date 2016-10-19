@@ -34,7 +34,7 @@ void allocate_header_page() {
   // Reserve the resources in shared for this allocation
   int file_no, file_descriptor;
   int mmap_page_no = __sync_add_and_fetch(&shared->number_mmap, 1); // Allocating one page
-  char * destination = ((char*) MIN((void *) shared->firstpg, shared->first_huge)) + PAGE_SIZE * mmap_page_no;
+  char * destination = ((char*) shared) + (PAGE_SIZE * mmap_page_no);
   if (speculating()) {
     file_no = __sync_add_and_fetch(&shared->header_num, 1);
   } else {
