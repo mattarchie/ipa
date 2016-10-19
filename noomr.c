@@ -18,8 +18,7 @@ size_t my_growth;
 extern bool speculating(void);
 
 bool out_of_range(void * payload) {
-  return payload < (void*) shared->base ||
-    payload >= (void *) (((char*)shared->base) + shared->spec_growth);
+  return payload < (void*) shared->base || payload >= sbrk(0);
 }
 
 static header_t * lookup_header(void * user_payload) {
@@ -66,7 +65,7 @@ static header_page_t * payload_to_header_page(void * payload) {
 
 size_t noomr_usable_space(void * payload) {
   if (out_of_range(payload)) {
-    return getblock(payload)->huge_block_sz;
+    return getblock(payload)->huge_block_sz - sizeof(block_t);
   } else {
     return getblock(payload)->header->size - sizeof(block_t);
   }
@@ -202,7 +201,9 @@ void noomr_free(void * payload) {
     // A huge block is unmapped directly to kernel
     // This can be done immediately -- there is no re-allocation conflicts
     block_t * block = getblock(payload);
-    munmap(block, (block->huge_block_sz & ~ALIGNMENT) + sizeof(block_t));
+    if (munmap(block, block->huge_block_sz) == -1) {
+      perror("Unable to unmap block");
+    }
   } else {
     // TODO do I need to delay the free while speculating?
     //  there is no overwrite issue

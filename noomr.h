@@ -71,7 +71,7 @@ typedef struct {
 
 typedef union {
   header_t * header;
-  size_t huge_block_sz;
+  size_t huge_block_sz; //Note: this includes the block_t space
 } block_t;
 
 
