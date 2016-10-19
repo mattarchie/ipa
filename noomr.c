@@ -80,7 +80,7 @@ inline size_t noomr_usable_space(void * payload) {
  into all process's private address space
  To solve this, promise all spec-growth regions
 */
-inline header_page_t * lastheaderpg() {
+header_page_t * lastheaderpg() {
   volatile header_page_t * page = shared->firstpg;
   if (page == NULL) {
     return NULL;
@@ -90,13 +90,6 @@ inline header_page_t * lastheaderpg() {
   }
   assert(page != NULL);
   return (header_page_t *) page;
-}
-
-void allocate_header_page() {
-  header_page_t * hpg = NULL; //TODO map
-  hpg->next_free = 0;
-  hpg->next = NULL;
-  ; //TODO implement
 }
 
 static inline void map_headers(char * begin, size_t block_size, size_t num_blocks) {
@@ -215,12 +208,4 @@ void print_noomr_stats() {
     printf("class %d allocations: %u\n", index, shared->allocs_per_class[index]);
   }
 #endif
-}
-
-
-int main(int argc, char ** argv) {
-  printf("header_t size %lu\n", sizeof(header_t));
-  printf("header_pg_t size %lu\n", sizeof(header_page_t));
-  printf("stack size: %lu\n", sizeof(stack_t));
-  printf("headers / page struct: %lu\n", HEADERS_PER_PAGE);
 }

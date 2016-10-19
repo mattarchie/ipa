@@ -54,7 +54,7 @@ void allocate_header_page() {
   } while (__sync_bool_compare_and_swap(&last_page->next, NULL, headers));
 }
 
-void* allocate_large(size_t size) {
+void * allocate_large(size_t size) {
   //TODO implement
   return NULL;
 }
