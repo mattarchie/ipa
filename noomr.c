@@ -233,7 +233,6 @@ void print_noomr_stats() {
 #endif
 }
 
-
 #ifdef NOOMR_SYSTEM_ALLOC
 void * malloc(size_t t) {
   return noomr_malloc(t);
