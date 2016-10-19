@@ -1,0 +1,18 @@
+language: c
+sudo: false
+compiler:
+  - gcc
+  - clang
+os:
+  - linux
+matrix:
+  fast_finish: true
+
+addons:
+  apt:
+    packages:
+    - gcc
+    - clang
+
+script:
+  - make && make test
