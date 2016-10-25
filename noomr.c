@@ -247,17 +247,7 @@ void print_noomr_stats() {
 #endif
 }
 
-#ifdef NOOMR_SYSTEM_ALLOC
-void * malloc(size_t t) {
-  return noomr_malloc(t);
-}
-void free(void * p) {
-  noomr_free(p);
-}
-size_t malloc_usable_size(void * p) {
-  return noomr_usable_space(p);
-}
-void * realloc(void * p, size_t size) {
+void * noomr_realloc(void * p, size_t size) {
   size_t original_size = noomr_usable_space(p);
   if (original_size >= size) {
     return p;
@@ -268,7 +258,72 @@ void * realloc(void * p, size_t size) {
     return new_payload;
   }
 }
+
+#ifdef NOOMR_SYSTEM_ALLOC
+#ifdef __GNUC__
+#include <malloc.h>
+
+static void * noomr_malloc_hook (size_t size, const void * c){
+  return noomr_malloc(size);
+}
+
+static void noomr_free_hook (void* payload, const void * c){
+  // After main, several frees are executed that shouldn't be
+  // Do not forward those to noomr_free
+  char ** caller_name;
+  caller_name = backtrace_symbols(&c, 1);
+  if (strcmp(caller_name[0], "__run_exit_handlers")) {
+    // Not equal -- forward the call
+    noomr_free(payload);
+  } else {
+    free(payload);
+  }
+  noomr_free(caller_name);
+}
+
+static void * noomr_realloc_hook(void * payload, size_t size, const void * c) {
+  return noomr_realloc(payload, size);
+}
+
+static void * noomr_calloc_hook(size_t a, size_t b, const void * c) {
+  return noomr_calloc(a, b);
+}
+
+static void noomr_dehook() {
+  __malloc_hook = NULL;
+  __free_hook = NULL;
+  __realloc_hook = NULL;
+#ifdef __calloc_hook
+  __calloc_hook = NULL;
+#endif
+}
+
+void __attribute__((constructor)) noomr_hook() {
+  atexit(noomr_dehook);
+  __malloc_hook = noomr_malloc_hook;
+  __free_hook = noomr_free_hook;
+  __realloc_hook = noomr_realloc_hook;
+#ifdef __calloc_hook
+  __calloc_hook = noomr_calloc_hook;
+#endif
+}
+
+
+#else
+void * malloc(size_t t) {
+  return noomr_malloc(t);
+}
+void free(void * p) {
+  noomr_free(p);
+}
+size_t malloc_usable_size(void * p) {
+  return noomr_usable_space(p);
+}
+void * realloc(void * p, size_t size) {
+  return noomr_realloc(p, size);
+}
 void * calloc(size_t a, size_t b) {
   return noomr_calloc(a, b);
 }
+#endif
 #endif

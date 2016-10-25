@@ -9,7 +9,7 @@ bool speculating() {
 }
 
 int main() {
-  int * payload = malloc(sizeof(int));
+  int * payload = calloc(sizeof(int), 1);
   printf("Noomr payload %p\n", payload);
   *payload = 42;
   printf("Override allocation worked\n");
