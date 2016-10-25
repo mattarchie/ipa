@@ -14,5 +14,7 @@ int main() {
   *payload = 42;
   printf("Override allocation worked\n");
   free(payload);
+  printf("Allocation freed\n");
+  print_noomr_stats();
   return 0;
 }

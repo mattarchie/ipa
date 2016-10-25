@@ -120,5 +120,8 @@ void * allocate_large(size_t size) {
   do {
     block->next_block = (block_t *) shared->large_block;
   } while(!__sync_bool_compare_and_swap(&shared->large_block, block->next_block, block));
+#ifdef COLLECT_STATS
+  __sync_add_and_fetch(&shared->huge_allocations, 1);
+#endif
   return getpayload(block);
 }

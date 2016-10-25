@@ -13,6 +13,7 @@ int main() {
   printf("Noomr payload %p\n", payload);
   *payload = 42;
   printf("Basic allocation test passed\n");
-  free(payload);
+  noomr_free(payload);
+  print_noomr_stats();
   return 0;
 }

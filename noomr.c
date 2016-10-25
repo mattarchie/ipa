@@ -157,6 +157,13 @@ static inline header_t * convert_head_mode_aware(node_t * node) {
                          container_of(node, header_t, seq_next);
 }
 
+int inc_heap(size_t s) {
+#ifdef COLLECT_STATS
+  __sync_add_and_fetch(&shared->sbrks, 1);
+#endif
+  return sbrk(s);
+}
+
 size_t stack_for_size(size_t min_size) {
   size_t klass;
   for (klass = 1; CLASS_TO_SIZE(klass) < min_size && klass < NUM_CLASSES; klass++) {
@@ -194,11 +201,11 @@ void * noomr_malloc(size_t size) {
       size_t my_region_size = size * blocks;
       if (speculating()) {
         // first allocate the extra space that's needed
-        sbrk(__sync_add_and_fetch(&shared->spec_growth, my_region_size) - my_growth);
+        inc_heap(__sync_add_and_fetch(&shared->spec_growth, my_region_size) - my_growth);
         __sync_add_and_fetch(&my_growth, size * blocks);
       }
       // Grow the heap by the space needed for my allocations
-      char * base = sbrk(my_region_size);
+      char * base = inc_heap(my_region_size);
       // now map headers for my new (private) address region
       map_headers(base, index, blocks);
       goto alloc;
@@ -210,6 +217,9 @@ void * noomr_malloc(size_t size) {
 }
 
 void noomr_free(void * payload) {
+#ifdef COLLECT_STATS
+  __sync_add_and_fetch(&shared->frees, 1);
+#endif
   if (out_of_range(payload)) {
     // A huge block is unmapped directly to kernel
     // This can be done immediately -- there is no re-allocation conflicts
@@ -268,17 +278,7 @@ static void * noomr_malloc_hook (size_t size, const void * c){
 }
 
 static void noomr_free_hook (void* payload, const void * c){
-  // After main, several frees are executed that shouldn't be
-  // Do not forward those to noomr_free
-  char ** caller_name;
-  caller_name = backtrace_symbols(&c, 1);
-  if (strcmp(caller_name[0], "__run_exit_handlers")) {
-    // Not equal -- forward the call
-    noomr_free(payload);
-  } else {
-    free(payload);
-  }
-  noomr_free(caller_name);
+  noomr_free(payload);
 }
 
 static void * noomr_realloc_hook(void * payload, size_t size, const void * c) {
