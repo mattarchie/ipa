@@ -5,12 +5,13 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <strings.h>
+#include <assert.h>
 #include "memmap.h"
 #include "noomr.h"
 
 extern shared_data_t * shared;
 extern bool speculating(void);
-extern header_page_t * lastheaderpg(void);
 
 
 static inline int mmap_fd(int file_no, const char * subdir) {
@@ -61,6 +62,7 @@ static inline void * allocate_noomr_page(noomr_page_t type, int file_no,
   // Reserve the resources in shared for this allocation
   int file_descriptor;
   size_t allocation_size = align(minsize, PAGE_SIZE);
+  assert(PAGE_SIZE > 0);
   int mmap_page_no = __sync_add_and_fetch(&shared->number_mmap, allocation_size / PAGE_SIZE);
   char * destination = ((char*) shared) + (PAGE_SIZE * mmap_page_no);
   if (!speculating()) {
@@ -91,16 +93,21 @@ static inline void * allocate_noomr_page(noomr_page_t type, int file_no,
 void allocate_header_page() {
   int file_no = !speculating() ? -1 : __sync_add_and_fetch(&shared->header_num, 1);
   header_page_t * headers = allocate_noomr_page(header_pg, file_no, PAGE_SIZE, MAP_SHARED, NULL);
+  bzero(headers, PAGE_SIZE);
+  headers->next_free = 0;
   // Add increate_header_pgto the headers linked list
-  header_page_t * last_page = lastheaderpg();
-  if (last_page == NULL) {
-    shared->firstpg = headers;
+  if (shared->header_pg == NULL) {
+    shared->header_pg = headers;
   } else {
+    volatile header_page_t * last_page = shared->header_pg;
     do {
       while (last_page->next != NULL) {
+        assert(last_page != (volatile header_page_t *) last_page->next);
         last_page = (header_page_t *) last_page->next;
       }
-    } while (__sync_bool_compare_and_swap(&last_page->next, NULL, headers));
+    } while (!__sync_bool_compare_and_swap(&last_page->next, NULL, headers));
+    assert(headers != (volatile header_page_t *) headers->next);
+    assert((volatile header_page_t *) last_page->next != last_page);
   }
 }
 
@@ -109,6 +116,7 @@ void * allocate_large(size_t size) {
   size_t alloc_size;
   block_t * block = allocate_noomr_page(large_alloc, file_no, size, MAP_PRIVATE, &alloc_size);
   block->huge_block_sz = alloc_size;
+  block->file_name = file_no;
   do {
     block->next_block = (block_t *) shared->large_block;
   } while(!__sync_bool_compare_and_swap(&shared->large_block, block->next_block, block));

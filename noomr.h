@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <math.h>
+#include <assert.h>
 #include "stack.h"
 
 
@@ -10,7 +11,8 @@
 #define NUM_CLASSES (16)
 #define SIZE_OFFSET (5)
 #define CLASS_TO_SIZE(x) (1 << ((x) + SIZE_OFFSET)) // to actually be determined later
-#define SIZE_TO_CLASS(x) ((size_t) x >> (SIZE_OFFSET + 1))
+#define LOG2(x) ((size_t) (8*sizeof (typeof(x)) - __builtin_clzll((x)) - 1))
+#define SIZE_TO_CLASS(x) (LOG2(x) - SIZE_OFFSET)
 #define MAX_SIZE CLASS_TO_SIZE(((NUM_CLASSES) - 1))
 
 #if __WORDSIZE == 64
@@ -30,6 +32,10 @@
                           (sizeof(volatile struct header_page_t *) + sizeof(size_t)))  \
                           / sizeof(header_t))
 
+
+static size_t llog2(size_t x) {
+  return LOG2(x);
+}
 
 typedef union {
 #ifdef NOOMR_ALIGN_HEADERS
@@ -74,6 +80,7 @@ typedef union {
   struct {
     size_t huge_block_sz; //Note: this includes the block_t space
     void * next_block;
+    int file_name;
   };
 } block_t;
 
@@ -96,7 +103,7 @@ typedef struct {
   volatile size_t spec_growth; // grow (B) done by spec group
   volatile unsigned header_num; // next header file to use
   volatile unsigned large_num; // next file for large allocation
-  volatile header_page_t * firstpg; // the address of the first header mmap page
+  volatile header_page_t * header_pg; // the address of the first header mmap page
   volatile block_t * large_block; // pointer into the list of large blocks
   volatile size_t number_mmap; // how many pages where mmaped (headers & large)
 } shared_data_t;
@@ -116,7 +123,8 @@ static void * getpayload(block_t * block) {
   return (void *) (((char*) block) + sizeof(block_t));
 }
 
-static size_t align(size_t value, size_t alignment) {
+static inline size_t align(size_t value, size_t alignment) {
+  assert(1 << LOG2(alignment) == alignment);
   return (((value) + (alignment-1)) & ~(alignment-1));
 }
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
