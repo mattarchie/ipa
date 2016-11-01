@@ -12,7 +12,7 @@
 #define SIZE_OFFSET (5)
 #define CLASS_TO_SIZE(x) (1 << ((x) + SIZE_OFFSET)) // to actually be determined later
 #define LOG2(x) ((size_t) (8*sizeof (typeof(x)) - __builtin_clzll((x)) - 1))
-#define SIZE_TO_CLASS(x) (LOG2(x) - SIZE_OFFSET)
+#define SIZE_TO_CLASS(x) (class_for_size(x))
 #define MAX_SIZE CLASS_TO_SIZE(((NUM_CLASSES) - 1))
 
 #if __WORDSIZE == 64
@@ -48,8 +48,6 @@ typedef union {
     void * payload;
     size_t size;
   };
-  // do I need to set low-end bits for allocated in spec / seq ...?
-  // yes -- look up header of freed payload to check when alloc in O(1) time
 } header_t;
 
 
@@ -96,6 +94,7 @@ typedef struct {
   volatile line_int_t sbrks;
   volatile unsigned allocs_per_class[NUM_CLASSES];
   volatile line_int_t huge_allocations;
+  volatile line_int_t header_pages;
 #endif
   stack_t seq_free[NUM_CLASSES]; // sequential free list
   stack_t spec_free[NUM_CLASSES]; // speculative free list
@@ -123,10 +122,6 @@ static void * getpayload(block_t * block) {
   return (void *) (((char*) block) + sizeof(block_t));
 }
 
-static inline size_t align(size_t value, size_t alignment) {
-  assert(1 << LOG2(alignment) == alignment);
-  return (((value) + (alignment-1)) & ~(alignment-1));
-}
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
 #define MAX(a,b) ((a) > (b) ? (a) : (b))
 

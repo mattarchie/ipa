@@ -61,9 +61,8 @@ static inline void * allocate_noomr_page(noomr_page_t type, int file_no,
   void * allocation = NULL;
   // Reserve the resources in shared for this allocation
   int file_descriptor;
-  size_t allocation_size = align(minsize, PAGE_SIZE);
-  assert(PAGE_SIZE > 0);
-  int mmap_page_no = __sync_add_and_fetch(&shared->number_mmap, allocation_size / PAGE_SIZE);
+  size_t allocation_size = MAX(minsize, PAGE_SIZE);
+  int mmap_page_no = __sync_add_and_fetch(&shared->number_mmap, MAX(1, allocation_size / PAGE_SIZE));
   char * destination = ((char*) shared) + (PAGE_SIZE * mmap_page_no);
   if (!speculating()) {
     flags |= MAP_ANONYMOUS;
@@ -93,11 +92,15 @@ static inline void * allocate_noomr_page(noomr_page_t type, int file_no,
 void allocate_header_page() {
   int file_no = !speculating() ? -1 : __sync_add_and_fetch(&shared->header_num, 1);
   header_page_t * headers = allocate_noomr_page(header_pg, file_no, PAGE_SIZE, MAP_SHARED, NULL);
+  if (headers == (header_page_t *) -1) {
+    exit(-1);
+  }
   bzero(headers, PAGE_SIZE);
   headers->next_free = 0;
   // Add increate_header_pgto the headers linked list
   if (shared->header_pg == NULL) {
     shared->header_pg = headers;
+    assert(shared->header_pg != shared->header_pg->next);
   } else {
     volatile header_page_t * last_page = shared->header_pg;
     do {
@@ -109,12 +112,18 @@ void allocate_header_page() {
     assert(headers != (volatile header_page_t *) headers->next);
     assert((volatile header_page_t *) last_page->next != last_page);
   }
+#ifdef COLLECT_STATS
+  __sync_add_and_fetch(&shared->header_pages, 1);
+#endif
 }
 
 void * allocate_large(size_t size) {
   int file_no = !speculating() ? -1 : __sync_add_and_fetch(&shared->large_num, 1);
   size_t alloc_size;
   block_t * block = allocate_noomr_page(large_alloc, file_no, size, MAP_PRIVATE, &alloc_size);
+  if (block == (block_t *) -1) {
+    return NULL;
+  }
   block->huge_block_sz = alloc_size;
   block->file_name = file_no;
   do {

@@ -16,5 +16,6 @@ int main() {
   printf("Large allocation passed\n");
   noomr_free(payload);
   printf("Successfully freed large block\n");
+  print_noomr_stats();
   return 0;
 }

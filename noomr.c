@@ -16,6 +16,8 @@
 shared_data_t * shared;
 size_t my_growth;
 
+static stack_t delayed_frees[NUM_CLASSES];
+
 extern bool speculating(void);
 
 bool out_of_range(void * payload) {
@@ -79,32 +81,29 @@ size_t noomr_usable_space(void * payload) {
  To solve this, promise all spec-growth regions
 */
 static void map_headers(char * begin, size_t index, size_t num_blocks) {
-  size_t i, header_index = HEADERS_PER_PAGE + 1;
+  size_t i, header_index = -1;
   volatile header_page_t * page;
   size_t block_size = CLASS_TO_SIZE(index);
   stack_t * spec_stack = &shared->spec_free[index];
   stack_t * seq_stack = &shared->seq_free[index];
+  block_t * block;
   assert(block_size == ALIGN(block_size));
 
-  for (i = 0; i < num_blocks - 1; i++) {
-    while(header_index >= (HEADERS_PER_PAGE - 1)) {
+  for (i = 0; i < num_blocks; i++) {
+    while(header_index >= (HEADERS_PER_PAGE - 1) || header_index == -1) {
       for (page = shared->header_pg; page != NULL; page = (volatile header_page_t *) page->next) {
-        if (page->next_free >= HEADERS_PER_PAGE) {
-          continue;
-        }
-        header_index = __sync_add_and_fetch(&page->next_free, 1);
-        if (header_index < HEADERS_PER_PAGE) {
-          break;
-        } else {
-          __sync_add_and_fetch(&page->next_free, -1);
+        if (page->next_free < HEADERS_PER_PAGE - 1) {
+          header_index = __sync_add_and_fetch(&page->next_free, 1);
+          if (header_index < HEADERS_PER_PAGE) {
+            goto found;
+          }
         }
       }
       if (page == NULL) {
         allocate_header_page();
       }
-
     }
-    block_t * block = (block_t *) (&begin[i * block_size]);
+    found: block = (block_t *) (&begin[i * block_size]);
 
     page->headers[header_index].size = block_size;
     // mmaped pages are padded with zeros, set NULL anyways
@@ -116,6 +115,7 @@ static void map_headers(char * begin, size_t index, size_t num_blocks) {
     push(seq_stack, (node_t * ) &page->headers[header_index].seq_next);
     push(spec_stack, (node_t * ) &page->headers[header_index].spec_next);
     // get the i-block
+    header_index = -1;
   }
 }
 
@@ -136,16 +136,21 @@ void beginspec() {
   set_large_perm(MAP_PRIVATE);
 }
 
+void free_delayed(void);
+
 void endspec() {
   promote_list();
   set_large_perm(MAP_SHARED);
+  free_delayed();
 }
 
 void noomr_init() {
-  shared = mmap(NULL, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-  bzero(shared, PAGE_SIZE);
-  shared->number_mmap = 1;
-  shared->base = (size_t) sbrk(0); // get the starting address
+  if (shared == NULL) {
+    shared = mmap(NULL, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    bzero(shared, PAGE_SIZE);
+    shared->number_mmap = 1;
+    shared->base = (size_t) sbrk(0); // get the starting address
+  }
 }
 
 #define container_of(ptr, type, member) ({ \
@@ -166,13 +171,21 @@ void * inc_heap(size_t s) {
 
 size_t stack_for_size(size_t min_size) {
   size_t klass;
-  for (klass = 1; CLASS_TO_SIZE(klass) < min_size && klass < NUM_CLASSES; klass++) {
+  for (klass = 0; CLASS_TO_SIZE(klass) < min_size && klass < NUM_CLASSES; klass++) {
     ;
   }
   if (klass >= NUM_CLASSES) {
     return -1;
   }
   return CLASS_TO_SIZE(klass);
+}
+
+size_t class_for_size(size_t size) {
+  size_t index;
+  for (index = 0; CLASS_TO_SIZE(index) < size; index++) {
+    ;
+  }
+  return index;
 }
 
 void * noomr_malloc(size_t size) {
@@ -193,15 +206,15 @@ void * noomr_malloc(size_t size) {
     stack_node = pop(stack);
     if (! stack_node) {
       // Need to grow the space
-      size_t size = align(aligned, CLASS_TO_SIZE(0));
+      size_t index = class_for_size(aligned);
+      size_t size = CLASS_TO_SIZE(index);
       assert(size > 0);
-      size_t index = SIZE_TO_CLASS(size);
       size_t blocks = max(1024 / size, 5);
 
       size_t my_region_size = size * blocks;
       if (speculating()) {
         // first allocate the extra space that's needed
-        inc_heap(__sync_add_and_fetch(&shared->spec_growth, my_region_size) - my_growth);
+        sbrk(__sync_add_and_fetch(&shared->spec_growth, my_region_size) - my_growth);
         __sync_add_and_fetch(&my_growth, size * blocks);
       }
       // Grow the heap by the space needed for my allocations
@@ -212,6 +225,9 @@ void * noomr_malloc(size_t size) {
     }
     header = convert_head_mode_aware(stack_node);
     assert(header->payload != NULL);
+#ifdef COLLECT_STATS
+      __sync_add_and_fetch(&shared->allocs_per_class[class_for_size(aligned)], 1);
+#endif
     return header->payload;
   }
 }
@@ -227,13 +243,32 @@ void noomr_free(void * payload) {
     if (munmap(block, block->huge_block_sz) == -1) {
       perror("Unable to unmap block");
     }
-  } else {
-    // TODO do I need to delay the free while speculating?
-    //  there is no overwrite issue
+  } else if (!speculating()) {
+    // Not speculating -- free now
     header_t * header = getblock(payload)->header;
     // look up the index & push onto the stack
     stack_t * stack = get_stack_index(SIZE_TO_CLASS(header->size));
     push(stack, speculating() ? &header->spec_next : &header->seq_next);
+  } else {
+    /**
+     * We can use the speculative next. If the payload was allocated speculatively,
+     * 	then the spec next is not needed
+     * If it was originally allocated sequentially (eg. before starting spec)
+     * 	then spec_next was unused -- no need to keep around
+     */
+    unsigned index = SIZE_TO_CLASS(noomr_usable_space(payload));
+    push_ageless(&delayed_frees[index], &getblock(payload)->header->spec_next);
+  }
+}
+
+void free_delayed() {
+  size_t index;
+  for (index = 0; index < NUM_CLASSES; index++) {
+    while (!empty(&delayed_frees[index])) {
+      node_t * node = pop_ageless(&delayed_frees[index]);
+      header_t * head = container_of(node, header_t, spec_next);
+      push(&shared->spec_free[index], &head->spec_next);
+    }
   }
 }
 
@@ -251,6 +286,7 @@ void print_noomr_stats() {
   printf("frees: %u\n", shared->frees);
   printf("sbrks: %u\n", shared->sbrks);
   printf("huge allocations: %u\n", shared->huge_allocations);
+  printf("header pages: %u\n", shared->header_pages);
   for (index = 0; index < NUM_CLASSES; index++) {
     printf("class %d allocations: %u\n", index, shared->allocs_per_class[index]);
   }
@@ -308,8 +344,8 @@ void __attribute__((constructor)) noomr_hook() {
 #endif
 }
 
-
 #else
+
 void * malloc(size_t t) {
   return noomr_malloc(t);
 }

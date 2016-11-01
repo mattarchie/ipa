@@ -1,12 +1,12 @@
 CC = gcc
 INCFLAGS = -I./
 DEFS = -D NOOMR_ALIGN_HEADERS -D COLLECT_STATS -D NOOMR_SYSTEM_ALLOC
-OPT_FLAGS = -O0 -fno-inline
-DEBUG = -pg -ggdb3 -ggdb -g
+OPT_FLAGS = -O0
+DEBUG_FLAGS = -pg -ggdb3 -ggdb -g
 CFLAGS = $(OPT_FLAGS) $(DEBUG_FLAGS) -Wall -Wno-unused-function -Wno-deprecated-declarations -march=native $(INCFLAGS) $(DEFS)
 TEST_BINARIES = $(basename $(wildcard tests/*.c))
 OBJECTS = noomr.o memmap.o
-LDFLAGS = -Wl,--no-as-needed -lm -ldl
+LDFLAGS = -Wl,--no-as-needed -lm -ldl -static
 
 default: $(OBJECTS)
 

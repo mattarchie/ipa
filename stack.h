@@ -86,6 +86,22 @@ static inline node_t * pop(volatile stack_t * stack) {
   }
 }
 
+static inline void push_ageless(stack_t * stack, node_t * node) {
+  node->next = (struct node_t *) stack->head;
+  stack->head = node;
+}
+
+static inline node_t * pop_ageless(stack_t * stack) {
+  if (stack->head == NULL) {
+    return NULL;
+  } else {
+    node_t * pop = stack->head;
+    stack->head = (node_t *) pop->next;
+    stack->age++;
+    return pop;
+  }
+}
+
 static inline stack_t * new_stack() {
   return calloc(1, sizeof(stack_t));
 }
