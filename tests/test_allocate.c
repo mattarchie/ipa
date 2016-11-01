@@ -3,6 +3,7 @@
 #include "noomr.h"
 
 extern void * noomr_malloc(size_t);
+extern void * noomr_free(void *);
 
 bool speculating() {
   return false;

@@ -157,7 +157,7 @@ static inline header_t * convert_head_mode_aware(node_t * node) {
                          container_of(node, header_t, seq_next);
 }
 
-int inc_heap(size_t s) {
+void * inc_heap(size_t s) {
 #ifdef COLLECT_STATS
   __sync_add_and_fetch(&shared->sbrks, 1);
 #endif
