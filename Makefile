@@ -23,7 +23,7 @@ tests/%: tests/%.c $(OBJECTS)
 tests: $(TEST_BINARIES)
 
 test: $(TEST_BINARIES)
-	@$(foreach tb, $?, echo ./$(tb) && ./$(tb) )
+	@ruby tests/test_runner.rb $(TEST_BINARIES)
 
 clean:
 	rm -f tests/*.o $(TEST_BINARIES) $(OBJECTS)
