@@ -1,4 +1,4 @@
-CC = gcc
+CC = gcc 
 INCFLAGS = -I./
 DEFS = -D NOOMR_ALIGN_HEADERS -D COLLECT_STATS -D NOOMR_SYSTEM_ALLOC
 OPT_FLAGS = -O0
@@ -12,9 +12,10 @@ default: $(OBJECTS)
 
 memmap.o: memmap.c memmap.h
 noomr.o: noomr.c noomr.h stack.h memmap.h
+tests/stack_%: stack.h
 
 # stack tests doesn't depend on the whole system -- special case
-tests/stack_%: tests/stack_%.c stack.h
+tests/stack_%: tests/stack_%.c
 	$(CC) $(CFLAGS) $? -o $@ $(LDFLAGS)
 
 tests/%: tests/%.c $(OBJECTS)
