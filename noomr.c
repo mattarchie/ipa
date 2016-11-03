@@ -209,12 +209,12 @@ void * noomr_malloc(size_t size) {
       size_t index = class_for_size(aligned);
       size_t size = CLASS_TO_SIZE(index);
       assert(size > 0);
-      size_t blocks = max(1024 / size, 5);
+      size_t blocks = max(1024 / size, 15);
 
       size_t my_region_size = size * blocks;
       if (speculating()) {
         // first allocate the extra space that's needed
-        sbrk(__sync_add_and_fetch(&shared->spec_growth, my_region_size) - my_growth);
+        inc_heap(__sync_add_and_fetch(&shared->spec_growth, my_region_size) - my_growth);
         __sync_add_and_fetch(&my_growth, size * blocks);
       }
       // Grow the heap by the space needed for my allocations

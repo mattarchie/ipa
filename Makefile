@@ -1,8 +1,8 @@
-CC = gcc 
+CC = gcc
 INCFLAGS = -I./
 DEFS = -D NOOMR_ALIGN_HEADERS -D COLLECT_STATS -D NOOMR_SYSTEM_ALLOC
 OPT_FLAGS = -O0
-DEBUG_FLAGS = -pg -ggdb3 -ggdb -g
+DEBUG_FLAGS = -ggdb3 -g
 CFLAGS = $(OPT_FLAGS) $(DEBUG_FLAGS) -Wall -Wno-unused-function -Wno-deprecated-declarations -march=native $(INCFLAGS) $(DEFS)
 TEST_BINARIES = $(basename $(wildcard tests/*.c))
 OBJECTS = noomr.o memmap.o
@@ -24,7 +24,8 @@ tests/%: tests/%.c $(OBJECTS)
 tests: $(TEST_BINARIES)
 
 test: $(TEST_BINARIES)
+	@echo Test binaries: $(notdir $(TEST_BINARIES))
 	@ruby tests/test_runner.rb $(TEST_BINARIES)
 
 clean:
-	rm -f tests/*.o $(TEST_BINARIES) $(OBJECTS)
+	rm -f tests/*.o $(TEST_BINARIES) $(OBJECTS) gmon.out
