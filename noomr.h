@@ -8,7 +8,8 @@
 
 
 // Header size macros
-#define NUM_CLASSES (16)
+#define MAX_CLASSES (8*sizeof(size_t) - 8 * SIZE_OFFSET)
+#define NUM_CLASSES (MAX_CLASSES)
 #define SIZE_OFFSET (5)
 #define CLASS_TO_SIZE(x) (1 << ((x) + SIZE_OFFSET)) // to actually be determined later
 #define LOG2(x) ((size_t) (8*sizeof (typeof(x)) - __builtin_clzll((x)) - 1))

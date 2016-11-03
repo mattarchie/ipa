@@ -3,7 +3,7 @@
 #include "noomr.h"
 
 extern void * noomr_malloc(size_t);
-extern void * noomr_free(void *);
+extern size_t noomr_usable_space(void*);
 
 bool speculating() {
   return false;
@@ -27,6 +27,7 @@ size_t uniform_size_class() {
 
 int main() {
   int rnd, check;
+  size_t alloc_size;
 
   srand(0);
 
@@ -36,7 +37,9 @@ int main() {
   int * ptrs[NUM_ROUNDS] = {NULL};
 
   for (rnd = 0; rnd < NUM_ROUNDS; rnd++) {
-    int * payload = noomr_malloc(uniform_size_class());
+    alloc_size = uniform_size_class();
+    int * payload = noomr_malloc(alloc_size);
+    assert(noomr_usable_space(payload) >= alloc_size);
     ptrs[rnd] = payload;
     for (check = 0; check < rnd; check++) {
       if (ptrs[check] == payload) {
