@@ -24,7 +24,7 @@
 #endif
 
 #define ALIGN(size) (((size) + (ALIGNMENT-1)) & ~(ALIGNMENT-1))
-
+#define PAGE_ALIGN(size) (((size) + (PAGE_SIZE-1)) & ~(PAGE_SIZE-1))
 
 
 #define PAGE_SIZE 4096 //default Linux
