@@ -5,12 +5,13 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <strings.h>
+#include <assert.h>
 #include "memmap.h"
 #include "noomr.h"
 
 extern shared_data_t * shared;
 extern bool speculating(void);
-extern header_page_t * lastheaderpg(void);
 
 
 static inline int mmap_fd(int file_no, const char * subdir) {
@@ -18,7 +19,7 @@ static inline int mmap_fd(int file_no, const char * subdir) {
     return -1;
   }
   char path[2048]; // 2 MB of path -- more than enough
-  int written = snprintf(&path[0], sizeof(path), "%s%d%s%d", "/tmp/bop/", getpgid(getpid()), subdir, file_no);
+  unsigned written = snprintf(&path[0], sizeof(path), "%s%d%s%d", "/tmp/bop/", getpgid(getpid()), subdir, file_no);
   if (written > sizeof(path) || written < 0) {
     perror("Unable to write the output path");
   }
@@ -51,17 +52,15 @@ typedef enum {
  * @param  minsize             the minimal size of the allocation, including any headers
  * @param  flags               baseline flags to pass to mmap, MAP_FIXED always added,
  *                             	MAP_ANONYMOUS while not speculating
- * @param  size                the acual size of the allocation will be written
- *                             	back to this address. if allocation fails, then
- *                             	the size that would have been allocated is written
  */
 static inline void * allocate_noomr_page(noomr_page_t type, int file_no,
-                                         size_t minsize, int flags, size_t * size) {
+                                         size_t minsize, int flags) {
   void * allocation = NULL;
   // Reserve the resources in shared for this allocation
   int file_descriptor;
-  size_t allocation_size = align(minsize, PAGE_SIZE);
-  int mmap_page_no = __sync_add_and_fetch(&shared->number_mmap, allocation_size / PAGE_SIZE);
+  size_t allocation_size = MAX(minsize, PAGE_SIZE);
+  assert(allocation_size % PAGE_SIZE == 0);
+  int mmap_page_no = __sync_add_and_fetch(&shared->number_mmap, MAX(1, allocation_size / PAGE_SIZE));
   char * destination = ((char*) shared) + (PAGE_SIZE * mmap_page_no);
   if (!speculating()) {
     flags |= MAP_ANONYMOUS;
@@ -80,37 +79,56 @@ static inline void * allocate_noomr_page(noomr_page_t type, int file_no,
   }
   allocation = mmap(destination, allocation_size, PROT_READ | PROT_WRITE, flags | MAP_FIXED, file_descriptor, 0);
   if ( (speculating() && allocation != (void *) destination) || allocation == (void *) -1) {
-    perror("Unable to set up header page");
-  }
-  if (size != NULL) {
-    *size = allocation_size;
+    perror("Unable to set up mmap page");
   }
   return allocation;
 }
 
 void allocate_header_page() {
   int file_no = !speculating() ? -1 : __sync_add_and_fetch(&shared->header_num, 1);
-  header_page_t * headers = allocate_noomr_page(header_pg, file_no, PAGE_SIZE, MAP_SHARED, NULL);
+  header_page_t * headers = allocate_noomr_page(header_pg, file_no, PAGE_SIZE, MAP_SHARED);
+  if (headers == (header_page_t *) -1) {
+    exit(-1);
+  }
+  bzero(headers, PAGE_SIZE);
+  headers->next_free = 0;
   // Add increate_header_pgto the headers linked list
-  header_page_t * last_page = lastheaderpg();
-  if (last_page == NULL) {
-    shared->firstpg = headers;
+  if (shared->header_pg == NULL) {
+    shared->header_pg = headers;
+    assert(shared->header_pg != (volatile header_page_t *) shared->header_pg->next);
   } else {
+    volatile header_page_t * last_page = shared->header_pg;
     do {
       while (last_page->next != NULL) {
+        assert(last_page != (volatile header_page_t *) last_page->next);
         last_page = (header_page_t *) last_page->next;
       }
-    } while (__sync_bool_compare_and_swap(&last_page->next, NULL, headers));
+    } while (!__sync_bool_compare_and_swap(&last_page->next, NULL, headers));
+    assert(headers != (volatile header_page_t *) headers->next);
+    assert((volatile header_page_t *) last_page->next != last_page);
   }
+#ifdef COLLECT_STATS
+  __sync_add_and_fetch(&shared->header_pages, 1);
+#endif
 }
 
 void * allocate_large(size_t size) {
   int file_no = !speculating() ? -1 : __sync_add_and_fetch(&shared->large_num, 1);
-  size_t alloc_size;
-  block_t * block = allocate_noomr_page(large_alloc, file_no, size, MAP_PRIVATE, &alloc_size);
+  // Align to a page size
+  size_t alloc_size = PAGE_ALIGN(size);
+  assert(alloc_size > size);
+  assert(alloc_size % PAGE_SIZE == 0);
+  block_t * block = allocate_noomr_page(large_alloc, file_no, alloc_size, MAP_PRIVATE);
+  if (block == (block_t *) -1) {
+    return NULL;
+  }
   block->huge_block_sz = alloc_size;
+  block->file_name = file_no;
   do {
     block->next_block = (block_t *) shared->large_block;
   } while(!__sync_bool_compare_and_swap(&shared->large_block, block->next_block, block));
+#ifdef COLLECT_STATS
+  __sync_add_and_fetch(&shared->huge_allocations, 1);
+#endif
   return getpayload(block);
 }

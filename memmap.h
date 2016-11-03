@@ -5,6 +5,6 @@
 
 void allocate_header_page(void);
 void* allocate_large(size_t);
-
+int create_large_pg(int);
 
 #endif

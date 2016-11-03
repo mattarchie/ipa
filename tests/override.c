@@ -3,19 +3,18 @@
 #include "noomr.h"
 
 extern void * noomr_malloc(size_t);
-extern void noomr_free(void*);
 
 bool speculating() {
   return false;
 }
 
 int main() {
-  int * payload = noomr_malloc(MAX_SIZE + 1);
+  int * payload = calloc(sizeof(int), 1);
   printf("Noomr payload %p\n", payload);
   *payload = 42;
-  printf("Large allocation passed\n");
-  noomr_free(payload);
-  printf("Successfully freed large block\n");
+  printf("Override allocation worked\n");
+  free(payload);
+  printf("Allocation freed\n");
   print_noomr_stats();
   return 0;
 }

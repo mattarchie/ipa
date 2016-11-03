@@ -4,3 +4,4 @@ override
 stack_parallel_test
 test_free
 test_large_alloc
+multi_alloc
