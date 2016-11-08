@@ -47,7 +47,7 @@ void synch_lists() {
 // mapping to spec / seq free lists
 // pre-spec is still needed OR 3x wide CAS operations -- 2 for the pointers
 // (which need to be adjacent to each other) and another for the counter
-static void promote_list() {
+void promote_list() {
   size_t i;
   volatile header_page_t * page;
   for (page = shared->header_pg; page != NULL; page = (header_page_t *) page->next) {
@@ -200,7 +200,9 @@ void * noomr_malloc(size_t size) {
   __sync_add_and_fetch(&shared->allocations, 1);
 #endif
   if (size > MAX_SIZE) {
-    return (void*) allocate_large(aligned);
+    void * block = allocate_large(aligned);
+    record_allocation(block, noomr_usable_space(block));
+    return block;
   } else {
     alloc: stack = get_stack_index(SIZE_TO_CLASS(aligned));
     stack_node = pop(stack);
@@ -209,7 +211,7 @@ void * noomr_malloc(size_t size) {
       size_t index = class_for_size(aligned);
       size_t size = CLASS_TO_SIZE(index);
       assert(size > 0);
-      size_t blocks = max(1024 / size, 15);
+      size_t blocks = MIN(HEADERS_PER_PAGE, max(1024 / size, 15));
 
       size_t my_region_size = size * blocks;
       if (speculating()) {
@@ -228,6 +230,7 @@ void * noomr_malloc(size_t size) {
 #ifdef COLLECT_STATS
       __sync_add_and_fetch(&shared->allocs_per_class[class_for_size(aligned)], 1);
 #endif
+    record_allocation(header->payload, header->size);
     return header->payload;
   }
 }

@@ -1,5 +1,5 @@
 CC = gcc
-INCFLAGS = -I./
+INCFLAGS = -I./ -I./noomr
 DEFS = -D NOOMR_ALIGN_HEADERS -D COLLECT_STATS -D NOOMR_SYSTEM_ALLOC
 OPT_FLAGS = -O0
 DEBUG_FLAGS = -ggdb3 -g
@@ -7,8 +7,13 @@ CFLAGS = $(OPT_FLAGS) $(DEBUG_FLAGS) -Wall -Wno-unused-function -Wno-deprecated-
 TEST_BINARIES = $(basename $(wildcard tests/*.c))
 OBJECTS = noomr.o memmap.o
 LDFLAGS = -Wl,--no-as-needed -lm -ldl -static
+LIBRARY = libnoomr.a
 
-default: $(OBJECTS)
+default: $(LIBRARY)
+
+$(LIBRARY): $(OBJECTS)
+	ar rcs $@ $?
+	ranlib $@
 
 memmap.o: memmap.c memmap.h
 noomr.o: noomr.c noomr.h stack.h memmap.h
@@ -18,7 +23,7 @@ tests/stack_%: stack.h
 tests/stack_%: tests/stack_%.c
 	$(CC) $(CFLAGS) $? -o $@ $(LDFLAGS)
 
-tests/%: tests/%.c $(OBJECTS)
+tests/%: tests/%.c $(OBJECTS) tests/dummy.h
 	$(CC) $(CFLAGS) $? -o $@ $(LDFLAGS)
 
 tests: $(TEST_BINARIES)

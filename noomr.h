@@ -15,6 +15,7 @@
 #define LOG2(x) ((size_t) (8*sizeof (typeof(x)) - __builtin_clzll((x)) - 1))
 #define SIZE_TO_CLASS(x) (class_for_size(x))
 #define MAX_SIZE CLASS_TO_SIZE(((NUM_CLASSES) - 1))
+#define MAX_REQUEST (ALIGN(MAX_SIZE - sizeof(block_t)))
 
 #if __WORDSIZE == 64
 #define ALIGNMENT (8) // I think?
@@ -125,5 +126,16 @@ static void * getpayload(block_t * block) {
 
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
 #define MAX(a,b) ((a) > (b) ? (a) : (b))
+
+void * noomr_malloc(size_t);
+void * noomr_calloc(size_t, size_t);
+void * noomr_realloc(void *, size_t);
+void noomr_free(void *);
+size_t noomr_usable_space(void *);
+
+void beginspec(void);
+void endspec(void);
+
+void record_allocation(void *, size_t);
 
 #endif

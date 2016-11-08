@@ -26,7 +26,7 @@ static inline int mmap_fd(int file_no, const char * subdir) {
   int fd = open(path, O_RDWR | O_CREAT | O_SYNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
   // need to truncate (grow -- poor naming) the file
   if (ftruncate(fd, PAGE_SIZE) < 0) {
-    perror("Unable to truncate/grow file");
+    perror("NOOMR_MMAP: Unable to truncate/grow file");
   }
   return fd;
 }

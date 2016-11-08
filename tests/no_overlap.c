@@ -1,13 +1,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "noomr.h"
+#include "dummy.h"
 
-extern void * noomr_malloc(size_t);
-extern size_t noomr_usable_space(void*);
-
-bool speculating() {
-  return false;
-}
 #define NUM_ROUNDS (NUM_CLASSES * 2)
 
 
