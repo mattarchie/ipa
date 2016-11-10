@@ -133,6 +133,11 @@ static inline void * allocate_noomr_page(noomr_page_t type, int file_no,
   if ( (speculating() && allocation != (void *) destination) || allocation == (void *) -1) {
     perror("Unable to set up mmap page");
   }
+  if (file_descriptor != -1) {
+    if (close(file_descriptor)) {
+      noomr_perror("Unable to close file descriptor");
+    }
+  }
   return allocation;
 }
 

@@ -86,20 +86,6 @@ void promote_list() {
       }
     }
   }
-
-  // size_t i;
-  // volatile header_page_t * page;
-  // for (page = shared->header_pg; page != NULL; page = (header_page_t *) page->next) {
-  //   for (i = 0; i < MIN(HEADERS_PER_PAGE, page->next_free); i++) {
-  //     if (!spec_alloced(&page->headers[i])) {
-  //       // page->headers[i].seq_next = spec_node_to_header(&page->headers[i].spec_next)->spec_next;
-  //     }
-  //   }
-  // }
-  // // Fix top of stack
-  // for (i = 0; i < NUM_CLASSES; i++) {
-  //    shared->seq_free[i] = shared->spec_free[i];
-  // }
 }
 
 static header_page_t * payload_to_header_page(void * payload) {
