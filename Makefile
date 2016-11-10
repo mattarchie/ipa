@@ -5,7 +5,7 @@ OPT_FLAGS = -O0
 DEBUG_FLAGS = -ggdb3 -g
 CFLAGS = $(OPT_FLAGS) $(DEBUG_FLAGS) -Wall -Wno-unused-function -Wno-deprecated-declarations -march=native $(INCFLAGS) $(DEFS)
 TEST_BINARIES = $(basename $(wildcard tests/*.c))
-OBJECTS = noomr.o memmap.o
+OBJECTS = noomr.o memmap.o noomr_utils.o
 LDFLAGS = -Wl,--no-as-needed -lm -ldl -static
 LIBRARY = libnoomr.a
 
@@ -15,8 +15,9 @@ $(LIBRARY): $(OBJECTS)
 	ar rcs $@ $?
 	ranlib $@
 
-memmap.o: memmap.c memmap.h
-noomr.o: noomr.c noomr.h stack.h memmap.h
+memmap.o: memmap.c memmap.h noomr_utils.h
+noomr.o: noomr.c noomr.h stack.h memmap.h noomr_utils.h
+noomr_utils.o: noomr_utils.c noomr.h noomr_utils.h
 tests/stack_%: stack.h
 
 # stack tests doesn't depend on the whole system -- special case
@@ -27,6 +28,8 @@ tests/%: tests/%.c $(OBJECTS) tests/dummy.h
 	$(CC) $(CFLAGS) $? -o $@ $(LDFLAGS)
 
 tests: $(TEST_BINARIES)
+
+foo: $(OBJECTS)
 
 test: $(TEST_BINARIES)
 	@echo Test binaries: $(notdir $(TEST_BINARIES))

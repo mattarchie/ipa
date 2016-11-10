@@ -30,9 +30,6 @@
 
 
 #define PAGE_SIZE 4096 //default Linux
-#define HEADERS_PER_PAGE ((PAGE_SIZE - \
-                          (sizeof(volatile struct header_page_t *) + sizeof(size_t)))  \
-                          / sizeof(header_t))
 
 
 static size_t llog2(size_t x) {
@@ -42,16 +39,15 @@ static size_t llog2(size_t x) {
 typedef union {
 #ifdef NOOMR_ALIGN_HEADERS
   //for header alignment to cache line bounds
-  char ____padding[64];
+  void * ____padding[64/sizeof(void*)];
 #endif
   struct {
-    node_t seq_next;
-    node_t spec_next;
     void * payload;
     size_t size;
+    node_t seq_next;
+    node_t spec_next;
   };
 } header_t;
-
 
 /*
   Header pages contain a list of (possibly unallocated) headers
@@ -64,6 +60,10 @@ typedef union {
   A header page is defined to be no more than PAGE_SIZE in length,
   and to fit the maximum number of headers as possible.
 */
+
+#define HEADERS_PER_PAGE ((PAGE_SIZE - \
+                          (sizeof(volatile struct header_page_t *) + sizeof(size_t)))  \
+                          / sizeof(header_t))
 
 //TODO need to include the ## (in path) for the next h pg
 // when looking up a header need to verify that the target is mapped in memory
@@ -114,6 +114,8 @@ typedef struct {
 // If compiled with the approiate flags, print the stats collected
 // during run time
 void print_noomr_stats(void);
+bool speculating(void);
+void noomr_init(void);
 
 // Utility functions
 static block_t * getblock(void * user_payload) {
@@ -122,6 +124,51 @@ static block_t * getblock(void * user_payload) {
 
 static void * getpayload(block_t * block) {
   return (void *) (((char*) block) + sizeof(block_t));
+}
+
+
+#define SPEC_ALLOC_B (1<<0)
+#define SEQ_ALLOC_B (1<<1)
+
+static inline void * payload(volatile header_t * header) {
+  return (void *) (((size_t) header->payload) & ~(SPEC_ALLOC_B | SEQ_ALLOC_B));
+}
+
+static inline void record_mode_alloc(volatile header_t * header) {
+  if (speculating()) {
+    __sync_fetch_and_or(&header->payload, SPEC_ALLOC_B);
+  } else {
+    __sync_fetch_and_or(&header->payload, SEQ_ALLOC_B);
+  }
+}
+
+static inline bool seq_alloced(volatile header_t * header) {
+  return (((size_t) header->payload) & SEQ_ALLOC_B) != 0;
+}
+
+static inline bool spec_alloced(volatile header_t * header) {
+  return (((size_t) header->payload) & SPEC_ALLOC_B) != 0;
+}
+
+static inline void record_mode_free(volatile header_t * header) {
+  if (speculating()) {
+    __sync_fetch_and_and(&header->payload, ~SPEC_ALLOC_B);
+  } else {
+    __sync_fetch_and_and(&header->payload, ~SEQ_ALLOC_B);
+  }
+}
+
+// Functions to convert between node links to the header
+#define container_of(ptr, type, member) ({ \
+                const typeof( ((type *)0)->member ) *__mptr = (ptr); \
+                (type *)( (char *)__mptr - __builtin_offsetof(type,member) );})
+
+static inline header_t * spec_node_to_header(node_t * node) {
+  return container_of(node, header_t, spec_next);
+}
+
+static inline header_t * seq_node_to_header(node_t * node) {
+  return container_of(node, header_t, seq_next);
 }
 
 #define MIN(a,b) ((a) < (b) ? (a) : (b))

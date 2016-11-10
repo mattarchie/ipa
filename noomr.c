@@ -6,9 +6,11 @@
 #include <sys/mman.h>
 #include <string.h>
 #include <assert.h>
+#include <error.h>
 #include "noomr.h"
 #include "memmap.h"
 #include "stack.h"
+#include "noomr_utils.h"
 
 
 #define max(a, b) ((a) > (b) ? (a) : (b))
@@ -17,8 +19,6 @@ shared_data_t * shared;
 size_t my_growth;
 
 static stack_t delayed_frees[NUM_CLASSES];
-
-extern bool speculating(void);
 
 bool out_of_range(void * payload) {
   return payload < (void*) shared->base || payload >= sbrk(0);
@@ -36,25 +36,70 @@ static inline stack_t * get_stack_index(size_t index) {
 void synch_lists() {
   size_t i;
   volatile header_page_t * page;
+  // Set the heads of the stacks to the corresponding elements
+  for (i = 0; i < NUM_CLASSES; i++) {
+    if(shared->seq_free[i].head != NULL) {
+      shared->spec_free[i].head = (node_t *) &seq_node_to_header(shared->seq_free[i].head)->spec_next;
+    } else {
+      shared->spec_free[i].head = NULL;
+    }
+  }
+
+  // Set the stack elements
   for (page = shared->header_pg; page != NULL; page = (header_page_t *) page->next) {
-    for (i = 0; i < page->next_free; i++) {
-      page->headers[i].spec_next = page->headers[i].seq_next;
+    for (i = 0; i < MIN(HEADERS_PER_PAGE, page->next_free); i++) {
+      if (!seq_alloced(&page->headers[i]) && page->headers[i].seq_next.next != NULL) {
+        header_t * next_header = seq_node_to_header((node_t*) page->headers[i].seq_next.next);
+        page->headers[i].spec_next.next = (struct node_t *) &next_header->spec_next;
+      } else {
+        page->headers[i].spec_next.next = NULL;
+      }
     }
   }
 }
 
-// This step can be eliminated by sticking the two items in an array and swaping the index
+// This step can (may?) be eliminated by sticking the two items in an array and swaping the index
 // mapping to spec / seq free lists
 // pre-spec is still needed OR 3x wide CAS operations -- 2 for the pointers
 // (which need to be adjacent to each other) and another for the counter
 void promote_list() {
   size_t i;
   volatile header_page_t * page;
-  for (page = shared->header_pg; page != NULL; page = (header_page_t *) page->next) {
-    for (i = 0; i < page->next_free; i++) {
-      page->headers[i].seq_next = page->headers[i].spec_next;
+  // Set the heads of the stacks to the corresponding elements
+  for (i = 0; i < NUM_CLASSES; i++) {
+    if(shared->spec_free[i].head != NULL) {
+      shared->seq_free[i].head = (node_t *) &spec_node_to_header(shared->spec_free[i].head)->seq_next;
+    } else {
+      shared->seq_free[i].head = NULL;
     }
   }
+
+  // Set the stack elements
+  for (page = shared->header_pg; page != NULL; page = (header_page_t *) page->next) {
+    for (i = 0; i < MIN(HEADERS_PER_PAGE, page->next_free); i++) {
+      assert(payload(&page->headers[i]) != NULL);
+      if (!spec_alloced(&page->headers[i]) && page->headers[i].seq_next.next != NULL) {
+        header_t * next_header = spec_node_to_header((node_t *) page->headers[i].spec_next.next);
+        page->headers[i].seq_next.next = (struct node_t *) &next_header->seq_next;
+      } else {
+        page->headers[i].seq_next.next = NULL;
+      }
+    }
+  }
+
+  // size_t i;
+  // volatile header_page_t * page;
+  // for (page = shared->header_pg; page != NULL; page = (header_page_t *) page->next) {
+  //   for (i = 0; i < MIN(HEADERS_PER_PAGE, page->next_free); i++) {
+  //     if (!spec_alloced(&page->headers[i])) {
+  //       // page->headers[i].seq_next = spec_node_to_header(&page->headers[i].spec_next)->spec_next;
+  //     }
+  //   }
+  // }
+  // // Fix top of stack
+  // for (i = 0; i < NUM_CLASSES; i++) {
+  //    shared->seq_free[i] = shared->spec_free[i];
+  // }
 }
 
 static header_page_t * payload_to_header_page(void * payload) {
@@ -74,7 +119,6 @@ size_t noomr_usable_space(void * payload) {
   }
 }
 
-
 /**
  NOTE: when in spec the headers pointers will not be
  into all process's private address space
@@ -93,7 +137,7 @@ static void map_headers(char * begin, size_t index, size_t num_blocks) {
     while(header_index >= (HEADERS_PER_PAGE - 1) || header_index == -1) {
       for (page = shared->header_pg; page != NULL; page = (volatile header_page_t *) page->next) {
         if (page->next_free < HEADERS_PER_PAGE - 1) {
-          header_index = __sync_add_and_fetch(&page->next_free, 1);
+          header_index = __sync_fetch_and_add(&page->next_free, 1);
           if (header_index < HEADERS_PER_PAGE) {
             goto found;
           }
@@ -109,8 +153,14 @@ static void map_headers(char * begin, size_t index, size_t num_blocks) {
     // mmaped pages are padded with zeros, set NULL anyways
     page->headers[header_index].spec_next.next = NULL;
     page->headers[header_index].seq_next.next = NULL;
-    block->header = (header_t * ) &page->headers[header_index];
     page->headers[header_index].payload = getpayload(block);
+
+    block->header = (header_t * ) &page->headers[header_index];
+    // (in)sanity checks
+    assert(getblock(getpayload(block)) == block);
+    assert(getblock(getpayload(block))->header == &page->headers[header_index]);
+    assert(payload(&page->headers[header_index]) == getpayload(block));
+
     __sync_synchronize(); // mem fence
     push(seq_stack, (node_t * ) &page->headers[header_index].seq_next);
     push(spec_stack, (node_t * ) &page->headers[header_index].spec_next);
@@ -125,12 +175,13 @@ static inline void set_large_perm(int flags) {
     int fd = create_large_pg(block->file_name);
     fsync(fd);
     if (!mmap(block, block->huge_block_sz, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0)) {
-      perror("Unable to reconfigure permissions.");
+      noomr_perror("Unable to reconfigure permissions.");
     }
   }
 }
 
 void beginspec() {
+  noomr_init();
   my_growth = 0;
   synch_lists();
   set_large_perm(MAP_PRIVATE);
@@ -153,13 +204,13 @@ void noomr_init() {
   }
 }
 
-#define container_of(ptr, type, member) ({ \
-                const typeof( ((type *)0)->member ) *__mptr = (ptr); \
-                (type *)( (char *)__mptr - __builtin_offsetof(type,member) );})
 
 static inline header_t * convert_head_mode_aware(node_t * node) {
-  return speculating() ? container_of(node, header_t, spec_next) :
-                         container_of(node, header_t, seq_next);
+  if (speculating()) {
+    return spec_node_to_header(node);
+  } else {
+    return seq_node_to_header(node);
+  }
 }
 
 void * inc_heap(size_t s) {
@@ -215,23 +266,33 @@ void * noomr_malloc(size_t size) {
 
       size_t my_region_size = size * blocks;
       if (speculating()) {
-        // first allocate the extra space that's needed
+        // first allocate the extra space that's needed. Don't record the to allocation
         inc_heap(__sync_add_and_fetch(&shared->spec_growth, my_region_size) - my_growth);
         __sync_add_and_fetch(&my_growth, size * blocks);
       }
       // Grow the heap by the space needed for my allocations
       char * base = inc_heap(my_region_size);
+      if (speculating()) {
+      record_allocation(base, my_region_size);
+      }
       // now map headers for my new (private) address region
       map_headers(base, index, blocks);
       goto alloc;
     }
     header = convert_head_mode_aware(stack_node);
-    assert(header->payload != NULL);
+    assert(payload(header) != NULL);
+    assert(getblock(payload(header))->header == header);
 #ifdef COLLECT_STATS
       __sync_add_and_fetch(&shared->allocs_per_class[class_for_size(aligned)], 1);
 #endif
-    record_allocation(header->payload, header->size);
-    return header->payload;
+    record_mode_alloc(header);
+    if (speculating()) {
+      assert(spec_alloced(header));
+    } else {
+      assert(seq_alloced(header));
+    }
+    record_allocation(payload(header), header->size);
+    return payload(header);
   }
 }
 
@@ -244,13 +305,14 @@ void noomr_free(void * payload) {
     // This can be done immediately -- there is no re-allocation conflicts
     block_t * block = getblock(payload);
     if (munmap(block, block->huge_block_sz) == -1) {
-      perror("Unable to unmap block");
+      noomr_perror("Unable to unmap block");
     }
   } else if (!speculating()) {
     // Not speculating -- free now
     header_t * header = getblock(payload)->header;
     // look up the index & push onto the stack
     stack_t * stack = get_stack_index(SIZE_TO_CLASS(header->size));
+    record_mode_free(header);
     push(stack, speculating() ? &header->spec_next : &header->seq_next);
   } else {
     /**
@@ -293,6 +355,8 @@ void print_noomr_stats() {
   for (index = 0; index < NUM_CLASSES; index++) {
     printf("class %d allocations: %u\n", index, shared->allocs_per_class[index]);
   }
+#else
+  printf("NOOMR not configured to collect statistics\n");
 #endif
 }
 
@@ -338,7 +402,7 @@ static void noomr_dehook() {
 }
 
 void __attribute__((constructor)) noomr_hook() {
-  atexit(noomr_dehook);
+  // atexit(noomr_dehook);
   __malloc_hook = noomr_malloc_hook;
   __free_hook = noomr_free_hook;
   __realloc_hook = noomr_realloc_hook;

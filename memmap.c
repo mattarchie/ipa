@@ -7,26 +7,78 @@
 #include <unistd.h>
 #include <strings.h>
 #include <assert.h>
+#include <error.h>
+#include <string.h>
 #include "memmap.h"
 #include "noomr.h"
+#include "noomr_utils.h"
 
 extern shared_data_t * shared;
 extern bool speculating(void);
 
 
+static inline int mkdir_ne(char * path, int flags) {
+  struct stat st = {0};
+  if (stat(path, &st) == -1) {
+    return mkdir(path, flags);
+  }
+  return 0;
+}
+
+// Recursively make directories
+// Based on:
+// http://nion.modprobe.de/blog/archives/357-Recursive-directory-creation.html
+static int rmkdir(char *dir) {
+  char tmp[256];
+  char *p = NULL;
+  size_t len;
+
+  snprintf(tmp, sizeof(tmp),"%s",dir);
+  len = strlen(tmp);
+  if(tmp[len - 1] == '/')
+          tmp[len - 1] = 0;
+  for(p = tmp + 1; *p; p++) {
+    if(*p == '/') {
+        *p = 0;
+        if (mkdir_ne(tmp, S_IRWXU)) {
+          return -1;
+        }
+        *p = '/';
+    }
+  }
+  return mkdir_ne(tmp, S_IRWXU);
+}
+
+/** NB: We cannot use perror -- it internally calls malloc*/
 static inline int mmap_fd(int file_no, const char * subdir) {
   if (!speculating()) {
     return -1;
   }
   char path[2048]; // 2 MB of path -- more than enough
-  unsigned written = snprintf(&path[0], sizeof(path), "%s%d%s%d", "/tmp/bop/", getpgid(getpid()), subdir, file_no);
+  unsigned written;
+  // ensure the directory is present
+  written = snprintf(&path[0], sizeof(path), "%s%d%s", "/tmp/bop/", getpgid(getpid()), subdir);
   if (written > sizeof(path) || written < 0) {
-    perror("Unable to write the output path");
+    noomr_perror("Unable to write directory name");
   }
+
+  if (rmkdir(&path[0])) {
+    noomr_perror("Unable to create the directory");
+  }
+  // now create the file
+  written = snprintf(&path[0], sizeof(path), "%s%d%s%d", "/tmp/bop/", getpgid(getpid()), subdir, file_no);
+  if (written > sizeof(path) || written < 0) {
+    noomr_perror("Unable to write the output path");
+  }
+
   int fd = open(path, O_RDWR | O_CREAT | O_SYNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+  if (fd == -1) {
+    noomr_perror("Unable to create the file.");
+  }
+
   // need to truncate (grow -- poor naming) the file
   if (ftruncate(fd, PAGE_SIZE) < 0) {
-    perror("NOOMR_MMAP: Unable to truncate/grow file");
+    noomr_perror("NOOMR_MMAP: Unable to truncate/grow file");
   }
   return fd;
 }
