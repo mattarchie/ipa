@@ -6,5 +6,6 @@
 void allocate_header_page(void);
 void* allocate_large(size_t);
 int create_large_pg(int);
+int getuniqueid(void);
 
 #endif

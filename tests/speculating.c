@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <unistd.h>
 #include "noomr.h"
 
 #define NUM_ROUNDS 50000
@@ -28,6 +29,10 @@ void record_allocation(void * p, size_t s) {
 
 bool speculating() {
   return spec;
+}
+
+int getuniqueid() {
+  return (int) getpgid(getpid());
 }
 
 int main() {

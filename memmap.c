@@ -57,7 +57,7 @@ static inline int mmap_fd(int file_no, const char * subdir) {
   char path[2048]; // 2 MB of path -- more than enough
   unsigned written;
   // ensure the directory is present
-  written = snprintf(&path[0], sizeof(path), "%s%d%s", "/tmp/bop/", getpgid(getpid()), subdir);
+  written = snprintf(&path[0], sizeof(path), "%s%d%s", "/tmp/bop/", getuniqueid(), subdir);
   if (written > sizeof(path) || written < 0) {
     noomr_perror("Unable to write directory name");
   }
@@ -66,7 +66,7 @@ static inline int mmap_fd(int file_no, const char * subdir) {
     noomr_perror("Unable to create the directory");
   }
   // now create the file
-  written = snprintf(&path[0], sizeof(path), "%s%d%s%d", "/tmp/bop/", getpgid(getpid()), subdir, file_no);
+  written = snprintf(&path[0], sizeof(path), "%s%d%s%d", "/tmp/bop/", getuniqueid(), subdir, file_no);
   if (written > sizeof(path) || written < 0) {
     noomr_perror("Unable to write the output path");
   }

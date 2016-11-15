@@ -42,10 +42,10 @@ typedef union {
   void * ____padding[64/sizeof(void*)];
 #endif
   struct {
-    void * payload;
-    size_t size;
-    node_t seq_next;
-    node_t spec_next;
+    void * payload; // This be set once and not made globally visable until set
+    size_t size; // This be set once and not made globally visable until set
+    volatile node_t seq_next;
+    volatile node_t spec_next;
   };
 } header_t;
 
@@ -79,7 +79,7 @@ typedef union {
   header_t * header;
   struct {
     size_t huge_block_sz; //Note: this includes the block_t space
-    void * next_block;
+    volatile void * next_block;
     int file_name;
   };
 } block_t;
@@ -98,8 +98,8 @@ typedef struct {
   volatile line_int_t huge_allocations;
   volatile line_int_t header_pages;
 #endif
-  stack_t seq_free[NUM_CLASSES]; // sequential free list
-  stack_t spec_free[NUM_CLASSES]; // speculative free list
+  volatile noomr_stack_t seq_free[NUM_CLASSES]; // sequential free list
+  volatile noomr_stack_t spec_free[NUM_CLASSES]; // speculative free list
   size_t base; //where segment begins (cache)
   volatile size_t spec_growth; // grow (B) done by spec group
   volatile unsigned header_num; // next header file to use
@@ -122,7 +122,7 @@ static block_t * getblock(void * user_payload) {
   return (block_t *) (((char*) user_payload) - sizeof(block_t));
 }
 
-static void * getpayload(block_t * block) {
+static void * getpayload(volatile block_t * block) {
   return (void *) (((char*) block) + sizeof(block_t));
 }
 
@@ -136,9 +136,9 @@ static inline void * payload(volatile header_t * header) {
 
 static inline void record_mode_alloc(volatile header_t * header) {
   if (speculating()) {
-    __sync_fetch_and_or(&header->payload, SPEC_ALLOC_B);
+    __sync_fetch_and_or((int *) &header->payload, SPEC_ALLOC_B);
   } else {
-    __sync_fetch_and_or(&header->payload, SEQ_ALLOC_B);
+    __sync_fetch_and_or((int *) &header->payload, SEQ_ALLOC_B);
   }
 }
 
@@ -152,9 +152,9 @@ static inline bool spec_alloced(volatile header_t * header) {
 
 static inline void record_mode_free(volatile header_t * header) {
   if (speculating()) {
-    __sync_fetch_and_and(&header->payload, ~SPEC_ALLOC_B);
+    __sync_fetch_and_and((int *) &header->payload, ~SPEC_ALLOC_B);
   } else {
-    __sync_fetch_and_and(&header->payload, ~SEQ_ALLOC_B);
+    __sync_fetch_and_and((int *) &header->payload, ~SEQ_ALLOC_B);
   }
 }
 
@@ -163,12 +163,12 @@ static inline void record_mode_free(volatile header_t * header) {
                 const typeof( ((type *)0)->member ) *__mptr = (ptr); \
                 (type *)( (char *)__mptr - __builtin_offsetof(type,member) );})
 
-static inline header_t * spec_node_to_header(node_t * node) {
-  return container_of(node, header_t, spec_next);
+static inline volatile header_t * spec_node_to_header(volatile node_t * node) {
+  return container_of(node, volatile header_t, spec_next);
 }
 
-static inline header_t * seq_node_to_header(node_t * node) {
-  return container_of(node, header_t, seq_next);
+static inline volatile header_t * seq_node_to_header(volatile node_t * node) {
+  return container_of(node, volatile header_t, seq_next);
 }
 
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
@@ -185,4 +185,5 @@ void endspec(void);
 
 void record_allocation(void *, size_t);
 
+void noomr_teardown(void);
 #endif

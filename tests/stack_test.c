@@ -17,8 +17,8 @@ data_node_t * alloc_node(int data) {
 int main() {
   const int elements = 5;
   int index, errors = 0;
-  node_t * empty_stack;
-  stack_t * stack = new_stack();
+  volatile node_t * empty_stack;
+  noomr_stack_t * stack = new_stack();
 
   for (index = 0; index < elements; index++) {
     push(stack, (node_t *) alloc_node(index));
