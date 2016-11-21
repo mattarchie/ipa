@@ -13,10 +13,10 @@ void parent(int * payload1, pid_t child, void* value) {
     ; // do nothing
   }
   assert(getblock(payload1)->header->spec_next.next == value);
-  kill(child, SIGINT);
-  printf("Header update test succeded\n");
-  exit(0);
+  // kill(child, SIGINT);
+
 }
+extern shared_data_t * shared;
 
 int main() {
   int * payload1 = noomr_malloc(sizeof(int));
@@ -29,8 +29,16 @@ int main() {
     // while(1) {
     //   ; // do nothing
     // }
+    while (shared->dummy != -1) {
+        ;
+    }
     printf("Child exits\n");
   } else {
-    parent(payload1, child, value);
+    while (getblock(payload1)->header->spec_next.next != value) {
+      ; // do nothing
+    }
+    assert(getblock(payload1)->header->spec_next.next == value);
+    shared->dummy = -1;
+    printf("Header update test succeded\n");
   }
 }

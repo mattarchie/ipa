@@ -8,3 +8,5 @@ multi_alloc
 no_overlap
 speculating
 header_updates
+speculating_large
+fork_alloc

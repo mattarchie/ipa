@@ -100,13 +100,14 @@ typedef struct {
 #endif
   volatile noomr_stack_t seq_free[NUM_CLASSES]; // sequential free list
   volatile noomr_stack_t spec_free[NUM_CLASSES]; // speculative free list
-  size_t base; //where segment begins (cache)
+  volatile size_t base; //where segment begins (cache)
   volatile size_t spec_growth; // grow (B) done by spec group
   volatile unsigned header_num; // next header file to use
   volatile unsigned large_num; // next file for large allocation
   volatile header_page_t * header_pg; // the address of the first header mmap page
   volatile block_t * large_block; // pointer into the list of large blocks
   volatile size_t number_mmap; // how many pages where mmaped (headers & large)
+  volatile int dummy; // used in unit tests
 } shared_data_t;
 
 // Function prototypes

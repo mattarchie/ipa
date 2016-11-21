@@ -99,7 +99,9 @@ static header_page_t * payload_to_header_page(void * payload) {
 }
 
 size_t noomr_usable_space(void * payload) {
-  if (out_of_range(payload)) {
+  if (payload == NULL) {
+    return 0;
+  } else if (out_of_range(payload)) {
     return getblock(payload)->huge_block_sz - sizeof(block_t);
   } else {
     return getblock(payload)->header->size - sizeof(block_t);
@@ -382,9 +384,8 @@ void * noomr_realloc(void * p, size_t size) {
 
 void noomr_teardown() {
   char path[2048]; // 2 MB of path -- more than enough
-  unsigned written;
   // ensure the directory is present
-  written = snprintf(&path[0], sizeof(path), "rm -rf /tmp/bop/%d", getuniqueid());
+  snprintf(&path[0], sizeof(path), "rm -rf /tmp/bop/%d", getuniqueid());
   if (system(&path[0]) != 0) {
     perror("Unable to destroy tmp directory!");
   }

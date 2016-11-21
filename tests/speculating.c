@@ -62,6 +62,6 @@ int main() {
     *payload = 42;
   }
   endspec();
-  printf("Basic allocation test passed\n");
+  printf("Small spec allocation test passed! No duplicate allocations detected\n");
   print_noomr_stats();
 }

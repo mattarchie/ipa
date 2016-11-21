@@ -23,5 +23,16 @@ void noomr_perror(const char * msg) {
   size_t tsize = snprintf(&master_buffer[0], sizeof(master_buffer), "%s: %s\n", msg, &error_buffer[0]);
   // Get
 
-  write(STDOUT_FILENO, &master_buffer[0], tsize);
+  if (write(STDOUT_FILENO, &master_buffer[0], tsize) == -1) {
+    // TODO log the error somewhere where dynamically allocation won't break all of the things
+  }
+}
+
+
+static int increase_heap(size_t amount) {
+  return 0;
+}
+
+static int increase_mmap(size_t amount) {
+  return 0;
 }

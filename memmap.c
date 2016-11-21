@@ -9,6 +9,9 @@
 #include <assert.h>
 #include <error.h>
 #include <string.h>
+#include <sys/time.h>
+#include <sys/resource.h>
+#include <errno.h>
 #include "memmap.h"
 #include "noomr.h"
 #include "noomr_utils.h"
@@ -32,7 +35,7 @@ static int rmkdir(char *dir) {
   char tmp[256];
   char *p = NULL;
   size_t len;
-
+  errno = 0;
   snprintf(tmp, sizeof(tmp),"%s",dir);
   len = strlen(tmp);
   if(tmp[len - 1] == '/')
@@ -50,7 +53,7 @@ static int rmkdir(char *dir) {
 }
 
 /** NB: We cannot use perror -- it internally calls malloc*/
-static inline int mmap_fd(int file_no, const char * subdir) {
+static int mmap_fd(int file_no, const char * subdir) {
   if (!speculating()) {
     return -1;
   }
@@ -62,8 +65,8 @@ static inline int mmap_fd(int file_no, const char * subdir) {
     noomr_perror("Unable to write directory name");
   }
 
-  if (rmkdir(&path[0])) {
-    noomr_perror("Unable to create the directory");
+  if (rmkdir(&path[0]) != 0 && errno != EEXIST) {
+    noomr_perror("Unable to make the directory");
   }
   // now create the file
   written = snprintf(&path[0], sizeof(path), "%s%d%s%d", "/tmp/bop/", getuniqueid(), subdir, file_no);
@@ -112,8 +115,9 @@ static inline void * allocate_noomr_page(noomr_page_t type, int file_no,
   int file_descriptor;
   size_t allocation_size = MAX(minsize, PAGE_SIZE);
   assert(allocation_size % PAGE_SIZE == 0);
+  assert(shared != NULL);
   int mmap_page_no = __sync_add_and_fetch(&shared->number_mmap, MAX(1, allocation_size / PAGE_SIZE));
-  char * destination = ((char*) shared) + (PAGE_SIZE * mmap_page_no);
+  char * destination = (char *) (shared - (PAGE_SIZE * mmap_page_no));
   if (!speculating()) {
     flags |= MAP_ANONYMOUS;
   }
@@ -130,8 +134,10 @@ static inline void * allocate_noomr_page(noomr_page_t type, int file_no,
       break;
   }
   allocation = mmap(destination, allocation_size, PROT_READ | PROT_WRITE, flags | MAP_FIXED, file_descriptor, 0);
-  if ( (speculating() && allocation != (void *) destination) || allocation == (void *) -1) {
-    perror("Unable to set up mmap page");
+  if (allocation == (void *) -1) {
+    noomr_perror("Unable to set up mmap page");
+  } else if (allocation != destination) {
+    noomr_perror("Unable to mmap to the required location");
   }
   if (file_descriptor != -1) {
     if (close(file_descriptor)) {
