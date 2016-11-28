@@ -97,6 +97,7 @@ typedef struct {
   volatile unsigned allocs_per_class[NUM_CLASSES];
   volatile line_int_t huge_allocations;
   volatile line_int_t header_pages;
+  volatile size_t total_alloc; // total space allocated from the system (heap + mmap)
 #endif
   volatile noomr_stack_t seq_free[NUM_CLASSES]; // sequential free list
   volatile noomr_stack_t spec_free[NUM_CLASSES]; // speculative free list

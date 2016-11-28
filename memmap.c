@@ -116,6 +116,9 @@ static inline void * allocate_noomr_page(noomr_page_t type, int file_no,
   size_t allocation_size = MAX(minsize, PAGE_SIZE);
   assert(allocation_size % PAGE_SIZE == 0);
   assert(shared != NULL);
+#ifdef COLLECT_STATS
+  __sync_add_and_fetch(&shared->total_alloc, allocation_size);
+#endif
   int mmap_page_no = __sync_add_and_fetch(&shared->number_mmap, MAX(1, allocation_size / PAGE_SIZE));
   char * destination = (char *) (shared - (PAGE_SIZE * mmap_page_no));
   if (!speculating()) {

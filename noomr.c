@@ -193,6 +193,9 @@ void noomr_init() {
     bzero(shared, PAGE_SIZE);
     shared->number_mmap = 1;
     shared->base = (size_t) sbrk(0); // get the starting address
+#ifdef COLLECT_STATS
+    shared->total_alloc = PAGE_SIZE;
+#endif
   }
 }
 
@@ -208,6 +211,7 @@ static inline volatile header_t * convert_head_mode_aware(volatile node_t * node
 void * inc_heap(size_t s) {
 #ifdef COLLECT_STATS
   __sync_add_and_fetch(&shared->sbrks, 1);
+  __sync_add_and_fetch(&shared->total_alloc, s);
 #endif
   return sbrk(s);
 }
@@ -308,7 +312,9 @@ void noomr_free(void * payload) {
 #ifdef COLLECT_STATS
   __sync_add_and_fetch(&shared->frees, 1);
 #endif
-  if (out_of_range(payload)) {
+  if (payload == NULL) {
+    return;
+  } else if (out_of_range(payload)) {
     // A huge block is unmapped directly to kernel
     // This can be done immediately -- there is no re-allocation conflicts
     block_t * block = getblock(payload);
@@ -352,10 +358,11 @@ void * noomr_calloc(size_t nmemb, size_t size) {
   }
   return payload;
 }
-
+#include <locale.h>
 void print_noomr_stats() {
 #ifdef COLLECT_STATS
   int index;
+  setlocale(LC_ALL,"");
   printf("NOOMR stats\n");
   printf("allocations: %u\n", shared->allocations);
   printf("frees: %u\n", shared->frees);
@@ -365,6 +372,7 @@ void print_noomr_stats() {
   for (index = 0; index < NUM_CLASSES; index++) {
     printf("class %d allocations: %u\n", index, shared->allocs_per_class[index]);
   }
+  printf("Total managed memory: %'ld B %'.2lf pages %'.2lf GB\n", shared->total_alloc, ((double) shared->total_alloc) / PAGE_SIZE,  ((double) shared->total_alloc) / (1024 * 1024 * 1024));
 #else
   printf("NOOMR not configured to collect statistics\n");
 #endif
