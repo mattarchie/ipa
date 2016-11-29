@@ -1,4 +1,4 @@
-CC = gcc
+CC ?= gcc
 INCFLAGS = -I./ -I./noomr
 DEFS = -D NOOMR_ALIGN_HEADERS -D COLLECT_STATS -D NOOMR_SYSTEM_ALLOC
 OPT_FLAGS = -O3 -fno-strict-aliasing -fno-strict-overflow

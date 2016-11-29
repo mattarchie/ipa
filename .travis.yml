@@ -1,5 +1,5 @@
 dist: trusty
-sudo: false
+sudo: required
 
 language: c
 
@@ -7,13 +7,20 @@ cache:
   apt: true
 
 compiler:
-  - gcc
-  - clang
+  - gcc-5
+  - clang-3.6
 
 addons:
   apt:
+    sources:
+    # add PPAs with more up-to-date toolchains
+    - ubuntu-toolchain-r-test
+    - llvm-toolchain-precise-3.6
     packages:
+    # install toolchains
     - gcc-5
+    - clang-3.6
 
 script:
+  - cc --version
   - make && make test
