@@ -5,25 +5,13 @@
 #include "noomr.h"
 
 #if __WORDSIZE == 64
-#define NUM_ROUNDS 100000
+#define NUM_ROUNDS 429
 #else
-#define NUM_ROUNDS 5
+#define NUM_ROUNDS 50
 #endif
 
 // Random number generation based off of http://www.azillionmonkeys.com/qed/random.html
 #define RS_SCALE (1.0 / (1.0 + RAND_MAX))
-
-size_t random_class () {
-    double d;
-    do {
-       d = (((rand () * RS_SCALE) + rand ()) * RS_SCALE + rand ()) * RS_SCALE;
-    } while (d >= 1); /* Round off */
-    return d * NUM_CLASSES;
-}
-
-size_t uniform_size_class() {
-  return ALIGN(CLASS_TO_SIZE(random_class()) - sizeof(block_t));
-}
 
 volatile bool spec = false;
 
@@ -53,8 +41,9 @@ int main() {
   srand(0);
 
   for (rnd = 1; rnd < NUM_ROUNDS; rnd++) {
-    alloc_size = uniform_size_class();
+    alloc_size = MAX_SIZE + sizeof(block_t) + 1;
     int * payload = noomr_malloc(alloc_size);
+    printf("rnd %d Allocated %p\n", rnd, payload);
     assert(noomr_usable_space(payload) >= alloc_size);
     ptrs[rnd] = payload;
     for (check = 0; check < rnd; check++) {
@@ -63,7 +52,7 @@ int main() {
         exit(-1);
       }
     }
-    *payload = 42;
+    *payload = 0xdeadbeef;
   }
   endspec();
   printf("Small spec allocation test passed! No duplicate allocations detected\n");

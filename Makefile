@@ -9,7 +9,7 @@ HEADERS = $(wildcard *.h)
 TEST_BINARIES = $(basename $(TEST_SOURCE))
 TEST_OBJECTS = $(patsubst %.c,%.o, $(TEST_SOURCE))
 OBJECTS = noomr.o memmap.o noomr_utils.o
-LDFLAGS = -Wl,--no-as-needed -ldl  -rdynamic
+LDFLAGS = -Wl,--no-as-needed -ldl -rdynamic -lm
 LIBRARY = libnoomr.a
 
 default: $(LIBRARY)
@@ -21,7 +21,7 @@ $(LIBRARY): $(OBJECTS)
 memmap.o: memmap.c memmap.h noomr_utils.h
 noomr.o: noomr.c noomr.h stack.h memmap.h noomr_utils.h
 noomr_utils.o: noomr_utils.c noomr.h noomr_utils.h
-tests/%.o: tests/%.c dummy.h noomr.h $(HEADERS)
+tests/%.o: tests/%.c dummy.h $(HEADERS)
 tests/stack_%: stack.h
 
 # stack tests doesn't depend on the whole system -- special case
@@ -38,7 +38,7 @@ tests/%: tests/%.o $(OBJECTS)
 	@$(CC) $(CFLAGS) -c -o $@ $<
 
 tests: $(TEST_OBJECTS) $(TEST_BINARIES)
-# NOTE: Tests objects is listed as a dependency so make will not auto-remove them 
+# NOTE: Tests objects is listed as a dependency so make will not auto-remove them
 
 test: $(TEST_BINARIES)
 	@echo Test binaries: $(notdir $(TEST_BINARIES))

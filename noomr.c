@@ -304,6 +304,7 @@ void * noomr_malloc(size_t size) {
       assert(seq_alloced(header));
     }
     record_allocation(payload(header), header->size);
+    assert(ALIGN((size_t) payload(header)) == (size_t) payload(header));
     return payload(header);
   }
 }
@@ -358,7 +359,10 @@ void * noomr_calloc(size_t nmemb, size_t size) {
   }
   return payload;
 }
+
 #include <locale.h>
+#include <math.h>
+
 void print_noomr_stats() {
 #ifdef COLLECT_STATS
   int index;
@@ -372,7 +376,16 @@ void print_noomr_stats() {
   for (index = 0; index < NUM_CLASSES; index++) {
     printf("class %d allocations: %u\n", index, shared->allocs_per_class[index]);
   }
-  printf("Total managed memory: %'ld B %'.2lf pages %'.2lf GB\n", shared->total_alloc, ((double) shared->total_alloc) / PAGE_SIZE,  ((double) shared->total_alloc) / (1024 * 1024 * 1024));
+  printf("Total managed memory:\n\t%'lu B\n\t%'.0lf pages\n\t%'.2lf GB\n\t%'.2lf TB\n",
+          (size_t) shared->total_alloc,
+          ceil(((double) shared->total_alloc) / PAGE_SIZE),
+          ((double) shared->total_alloc) / (1024L * 1024 * 1024),
+#if __WORDSIZE == 64
+          ((double) shared->total_alloc) / (1024L * 1024 * 1024 * 1024)
+#else
+          (double) 0
+#endif
+        );
 #else
   printf("NOOMR not configured to collect statistics\n");
 #endif

@@ -7,8 +7,17 @@
 #include "stack.h"
 
 
+#if __WORDSIZE == 64
+#define ALIGNMENT (8) // I think?
+#define MAX_CLASSES (8*sizeof(size_t) - (8 * SIZE_OFFSET))
+#elif __WORDSIZE == 32
+#define ALIGNMENT (4)
+#define MAX_CLASSES 16
+#else
+#error "Need 32 or 64 b wordsize"
+#endif
+
 // Header size macros
-#define MAX_CLASSES (8*sizeof(size_t) - 8 * SIZE_OFFSET)
 #define NUM_CLASSES (MAX_CLASSES)
 #define SIZE_OFFSET (5)
 #define CLASS_TO_SIZE(x) (1 << ((x) + SIZE_OFFSET)) // to actually be determined later
@@ -17,13 +26,6 @@
 #define MAX_SIZE CLASS_TO_SIZE(((NUM_CLASSES) - 1))
 #define MAX_REQUEST (ALIGN(MAX_SIZE - sizeof(block_t)))
 
-#if __WORDSIZE == 64
-#define ALIGNMENT (8) // I think?
-#elif __WORDSIZE == 32
-#define ALIGNMENT (4)
-#else
-#error "Need 32 or 64 b wordsize"
-#endif
 
 #define ALIGN(size) (((size) + (ALIGNMENT-1)) & ~(ALIGNMENT-1))
 #define PAGE_ALIGN(size) (((size) + (PAGE_SIZE-1)) & ~(PAGE_SIZE-1))
