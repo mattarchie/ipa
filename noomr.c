@@ -413,7 +413,7 @@ void noomr_teardown() {
 }
 
 #ifdef NOOMR_SYSTEM_ALLOC
-#ifdef __GNUC__
+#if defined(__GNUC__) && !defined(NO_HOOK)
 #include <malloc.h>
 
 static void * noomr_malloc_hook (size_t size, const void * c){

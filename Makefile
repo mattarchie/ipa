@@ -1,9 +1,9 @@
 CC = gcc
 INCFLAGS = -I./ -I./noomr
-DEFS = -D NOOMR_ALIGN_HEADERS -D COLLECT_STATS -D NOOMR_SYSTEM_ALLOC
+DEFS = -DNOOMR_ALIGN_HEADERS -DCOLLECT_STATS -DNOOMR_SYSTEM_ALLOC -DNO_HOOK
 OPT_FLAGS = -O3 -fno-strict-aliasing -fno-strict-overflow
 DEBUG_FLAGS = -ggdb3 -g3 -pg
-CFLAGS = $(OPT_FLAGS) $(DEBUG_FLAGS) -Wall -Wno-unused-function -Wno-deprecated-declarations -march=native $(INCFLAGS) $(DEFS)
+CFLAGS = $(OPT_FLAGS) $(DEBUG_FLAGS) -fPIC -Wall -Wno-unused-function -Wno-deprecated-declarations -march=native $(INCFLAGS) $(DEFS)
 TEST_SOURCE = $(wildcard tests/*.c)
 HEADERS = $(wildcard *.h)
 TEST_BINARIES = $(basename $(TEST_SOURCE))

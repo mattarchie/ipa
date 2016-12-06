@@ -52,6 +52,11 @@ static int rmkdir(char *dir) {
   return mkdir_ne(tmp, S_IRWXU);
 }
 
+void * claim_region(size_t s) {
+  int mmap_page_no = __sync_add_and_fetch(&shared->number_mmap, MAX(1, s / PAGE_SIZE));
+  return (char *) (shared - (PAGE_SIZE * mmap_page_no));
+}
+
 /** NB: We cannot use perror -- it internally calls malloc*/
 static int mmap_fd(int file_no, const char * subdir) {
   if (!speculating()) {
@@ -119,8 +124,7 @@ static inline void * allocate_noomr_page(noomr_page_t type, int file_no,
 #ifdef COLLECT_STATS
   __sync_add_and_fetch(&shared->total_alloc, allocation_size);
 #endif
-  int mmap_page_no = __sync_add_and_fetch(&shared->number_mmap, MAX(1, allocation_size / PAGE_SIZE));
-  char * destination = (char *) (shared - (PAGE_SIZE * mmap_page_no));
+  char * destination = claim_region(allocation_size);
   if (!speculating()) {
     flags |= MAP_ANONYMOUS;
   }
