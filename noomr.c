@@ -261,13 +261,13 @@ void * noomr_malloc(size_t size) {
       size_t my_region_size = size * blocks;
       if (speculating()) {
         // first allocate the extra space that's needed. Don't record the to allocation
-        inc_heap(__sync_add_and_fetch(&shared->spec_growth, my_region_size) - my_growth);
+        inc_heap(__sync_add_and_fetch(&shared->spec_growth, my_region_size) - my_growth - my_region_size);
         __sync_add_and_fetch(&my_growth, size * blocks);
       }
       // Grow the heap by the space needed for my allocations
       char * base = inc_heap(my_region_size);
       if (speculating()) {
-      record_allocation(base, my_region_size);
+        record_allocation(base, my_region_size);
       }
       // now map headers for my new (private) address region
       map_headers(base, index, blocks);
