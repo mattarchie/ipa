@@ -9,21 +9,30 @@
 
 #if __WORDSIZE == 64
 #define ALIGNMENT (8) // I think?
-#define MAX_CLASSES (8*sizeof(size_t) - (8 * SIZE_OFFSET))
 #elif __WORDSIZE == 32
 #define ALIGNMENT (4)
-#define MAX_CLASSES 16
 #else
 #error "Need 32 or 64 b wordsize"
 #endif
 
+static const size_t class_sizes[] = {
+  16, 32, 48, 64, 80, 96, 112, 128, // je malloc small
+  160, 192, 224, 256,
+  320, 384, 448, 512,
+  640, 768, 896, 1024,
+  1280, 1536, 1792, 2048,
+  3560, 3072, 3584,
+  4096, (4096 * 2), (4096 * 3), (4096 * 4), (4096 * 5),
+  // (4096 * 6), (4096 * 7), (4096 * 8), (4096 * 9),
+  // 1024 * 819, 2 * 1024 * 8192, 3 * 1024 * 8192, 4 * 1024 * 8192
+};
+
+#define NUM_CLASSES ((sizeof(class_sizes) / sizeof(size_t)))
+
 // Header size macros
-#define NUM_CLASSES (MAX_CLASSES)
-#define SIZE_OFFSET (5)
-#define CLASS_TO_SIZE(x) (1 << ((x) + SIZE_OFFSET)) // to actually be determined later
-#define LOG2(x) ((size_t) (8*sizeof (typeof(x)) - __builtin_clzll((x)) - 1))
-#define SIZE_TO_CLASS(x) (class_for_size(x))
-#define MAX_SIZE CLASS_TO_SIZE(((NUM_CLASSES) - 1))
+#define CLASS_TO_SIZE(x) (__size_to_class((unsigned) x)) // to actually be determined later
+#define SIZE_TO_CLASS(x) (class_for_size((unsigned) x))
+#define MAX_SIZE (class_sizes[NUM_CLASSES - 1])
 #define MAX_REQUEST (ALIGN(MAX_SIZE - sizeof(block_t)))
 
 
@@ -34,8 +43,19 @@
 #define PAGE_SIZE 4096 //default Linux
 
 
-static size_t llog2(size_t x) {
-  return LOG2(x);
+static inline size_t __size_to_class(unsigned x) {
+  assert(x >= 0 && x < NUM_CLASSES);
+  return class_sizes[x];
+}
+
+static inline size_t class_for_size(unsigned x) {
+  size_t s;
+  for (s = 0; s < NUM_CLASSES; s++) {
+    if (class_sizes[s] >= x) {
+      return s;
+    }
+  }
+  abort();
 }
 
 typedef union {

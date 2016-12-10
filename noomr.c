@@ -227,14 +227,6 @@ size_t stack_for_size(size_t min_size) {
   return CLASS_TO_SIZE(klass);
 }
 
-size_t class_for_size(size_t size) {
-  size_t index;
-  for (index = 0; CLASS_TO_SIZE(index) < size; index++) {
-    ;
-  }
-  return index;
-}
-
 void * noomr_malloc(size_t size) {
   volatile header_t * header;
   volatile noomr_stack_t * stack;

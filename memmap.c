@@ -181,7 +181,7 @@ void allocate_header_page() {
 void * allocate_large(size_t size) {
   int file_no = !speculating() ? -1 : __sync_add_and_fetch(&shared->large_num, 1);
   // Align to a page size
-  size_t alloc_size = PAGE_ALIGN(size);
+  size_t alloc_size = PAGE_ALIGN((size + sizeof(huge_block_t)));
   assert(alloc_size > size);
   assert(alloc_size % PAGE_SIZE == 0);
   huge_block_t * block = allocate_noomr_page(large_alloc, file_no, alloc_size, MAP_PRIVATE);
