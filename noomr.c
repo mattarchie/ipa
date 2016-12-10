@@ -366,7 +366,7 @@ void print_noomr_stats() {
   printf("huge allocations: %u\n", shared->huge_allocations);
   printf("header pages: %u\n", shared->header_pages);
   for (index = 0; index < NUM_CLASSES; index++) {
-    printf("class %d allocations: %u\n", index, shared->allocs_per_class[index]);
+    printf("class %2d (%'6lu B) allocations: %u\n", index, CLASS_TO_SIZE(index), shared->allocs_per_class[index]);
   }
   printf("Total managed memory:\n\t%'lu B\n\t%'.0lf pages\n\t%'.2lf GB\n\t%'.2lf TB\n",
           (size_t) shared->total_alloc,
