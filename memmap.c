@@ -184,8 +184,8 @@ void * allocate_large(size_t size) {
   size_t alloc_size = PAGE_ALIGN(size);
   assert(alloc_size > size);
   assert(alloc_size % PAGE_SIZE == 0);
-  block_t * block = allocate_noomr_page(large_alloc, file_no, alloc_size, MAP_PRIVATE);
-  if (block == (block_t *) -1) {
+  huge_block_t * block = allocate_noomr_page(large_alloc, file_no, alloc_size, MAP_PRIVATE);
+  if (block == (huge_block_t *) -1) {
     return NULL;
   }
   block->huge_block_sz = alloc_size;
@@ -196,5 +196,5 @@ void * allocate_large(size_t size) {
 #ifdef COLLECT_STATS
   __sync_add_and_fetch(&shared->huge_allocations, 1);
 #endif
-  return getpayload(block);
+  return gethugepayload(block);
 }

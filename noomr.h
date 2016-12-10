@@ -77,14 +77,15 @@ typedef struct {
   header_t headers[HEADERS_PER_PAGE];
 } header_page_t;
 
-typedef union {
+typedef struct {
   header_t * header;
-  struct {
-    size_t huge_block_sz; //Note: this includes the block_t space
-    volatile void * next_block;
-    int file_name;
-  };
 } block_t;
+
+typedef struct {
+  size_t huge_block_sz; //Note: this includes the block_t space
+  volatile void * next_block;
+  int file_name;
+} huge_block_t;
 
 
 // Used to collect statics with minimal cache impact
@@ -108,7 +109,7 @@ typedef struct {
   volatile unsigned header_num; // next header file to use
   volatile unsigned large_num; // next file for large allocation
   volatile header_page_t * header_pg; // the address of the first header mmap page
-  volatile block_t * large_block; // pointer into the list of large blocks
+  volatile huge_block_t * large_block; // pointer into the list of large blocks
   volatile size_t number_mmap; // how many pages where mmaped (headers & large)
   volatile int dummy; // used in unit tests
 } shared_data_t;
@@ -122,12 +123,20 @@ bool speculating(void);
 void noomr_init(void);
 
 // Utility functions
-static block_t * getblock(void * user_payload) {
+static inline block_t * getblock(void * user_payload) {
   return (block_t *) (((char*) user_payload) - sizeof(block_t));
+}
+
+static inline huge_block_t * gethugeblock(void * user_payload) {
+  return (huge_block_t *) (((char*) user_payload) - sizeof(huge_block_t));
 }
 
 static void * getpayload(volatile block_t * block) {
   return (void *) (((char*) block) + sizeof(block_t));
+}
+
+static void * gethugepayload(volatile huge_block_t * block) {
+  return (void *) (((char*) block) + sizeof(huge_block_t));
 }
 
 

@@ -102,7 +102,7 @@ size_t noomr_usable_space(void * payload) {
   if (payload == NULL) {
     return 0;
   } else if (out_of_range(payload)) {
-    return getblock(payload)->huge_block_sz - sizeof(block_t);
+    return gethugeblock(payload)->huge_block_sz - sizeof(block_t);
   } else {
     return getblock(payload)->header->size - sizeof(block_t);
   }
@@ -159,8 +159,8 @@ static void map_headers(char * begin, size_t index, size_t num_blocks) {
 }
 
 static inline void set_large_perm(int flags) {
-  volatile block_t * block;
-  for (block = (block_t *) shared->large_block; block != NULL; block = block->next_block) {
+  volatile huge_block_t * block;
+  for (block = (huge_block_t *) shared->large_block; block != NULL; block = block->next_block) {
     int fd = create_large_pg(block->file_name);
     fsync(fd);
     if (!mmap((void *) block, block->huge_block_sz, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0)) {
@@ -318,7 +318,7 @@ void noomr_free(void * payload) {
   } else if (out_of_range(payload)) {
     // A huge block is unmapped directly to kernel
     // This can be done immediately -- there is no re-allocation conflicts
-    block_t * block = getblock(payload);
+    huge_block_t * block = gethugeblock(payload);
     if (munmap(block, block->huge_block_sz) == -1) {
       noomr_perror("Unable to unmap block");
     }
