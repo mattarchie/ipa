@@ -102,7 +102,7 @@ size_t noomr_usable_space(void * payload) {
   if (payload == NULL) {
     return 0;
   } else if (out_of_range(payload)) {
-    return getblock(payload)->huge_block_sz - sizeof(block_t);
+    return gethugeblock(payload)->huge_block_sz - sizeof(block_t);
   } else {
     return getblock(payload)->header->size - sizeof(block_t);
   }
@@ -159,8 +159,8 @@ static void map_headers(char * begin, size_t index, size_t num_blocks) {
 }
 
 static inline void set_large_perm(int flags) {
-  volatile block_t * block;
-  for (block = (block_t *) shared->large_block; block != NULL; block = block->next_block) {
+  volatile huge_block_t * block;
+  for (block = (huge_block_t *) shared->large_block; block != NULL; block = block->next_block) {
     int fd = create_large_pg(block->file_name);
     fsync(fd);
     if (!mmap((void *) block, block->huge_block_sz, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0)) {
@@ -227,14 +227,6 @@ size_t stack_for_size(size_t min_size) {
   return CLASS_TO_SIZE(klass);
 }
 
-size_t class_for_size(size_t size) {
-  size_t index;
-  for (index = 0; CLASS_TO_SIZE(index) < size; index++) {
-    ;
-  }
-  return index;
-}
-
 void * noomr_malloc(size_t size) {
   volatile header_t * header;
   volatile noomr_stack_t * stack;
@@ -269,13 +261,13 @@ void * noomr_malloc(size_t size) {
       size_t my_region_size = size * blocks;
       if (speculating()) {
         // first allocate the extra space that's needed. Don't record the to allocation
-        inc_heap(__sync_add_and_fetch(&shared->spec_growth, my_region_size) - my_growth);
+        inc_heap(__sync_add_and_fetch(&shared->spec_growth, my_region_size) - my_growth - my_region_size);
         __sync_add_and_fetch(&my_growth, size * blocks);
       }
       // Grow the heap by the space needed for my allocations
       char * base = inc_heap(my_region_size);
       if (speculating()) {
-      record_allocation(base, my_region_size);
+        record_allocation(base, my_region_size);
       }
       // now map headers for my new (private) address region
       map_headers(base, index, blocks);
@@ -318,7 +310,7 @@ void noomr_free(void * payload) {
   } else if (out_of_range(payload)) {
     // A huge block is unmapped directly to kernel
     // This can be done immediately -- there is no re-allocation conflicts
-    block_t * block = getblock(payload);
+    huge_block_t * block = gethugeblock(payload);
     if (munmap(block, block->huge_block_sz) == -1) {
       noomr_perror("Unable to unmap block");
     }
@@ -374,7 +366,7 @@ void print_noomr_stats() {
   printf("huge allocations: %u\n", shared->huge_allocations);
   printf("header pages: %u\n", shared->header_pages);
   for (index = 0; index < NUM_CLASSES; index++) {
-    printf("class %d allocations: %u\n", index, shared->allocs_per_class[index]);
+    printf("class %2d (%'6lu B) allocations: %u\n", index, CLASS_TO_SIZE(index), shared->allocs_per_class[index]);
   }
   printf("Total managed memory:\n\t%'lu B\n\t%'.0lf pages\n\t%'.2lf GB\n\t%'.2lf TB\n",
           (size_t) shared->total_alloc,
