@@ -7,6 +7,8 @@ OPT_FLAGS = -O3 -fno-strict-aliasing -fno-strict-overflow
 DEBUG_FLAGS = -ggdb3 -g3 -pg
 CFLAGS = $(OPT_FLAGS) $(DEBUG_FLAGS) -fPIC -Wall -Wno-unused-function -Wno-deprecated-declarations -march=native $(INCFLAGS) $(DEFS)
 TEST_SOURCE = $(wildcard tests/*.c)
+SOURCE = $(wildcard *.c)
+ALL_SOURCE = $(TEST_SOURCE) $(SOURCE)
 HEADERS = $(wildcard *.h)
 TEST_BINARIES = $(basename $(TEST_SOURCE))
 TEST_OBJECTS = $(patsubst %.c,%.o, $(TEST_SOURCE))
@@ -20,11 +22,11 @@ $(LIBRARY): $(OBJECTS)
 	ar rcs $@ $?
 	ranlib $@
 
-memmap.o: memmap.c memmap.h noomr_utils.h
-noomr.o: noomr.c noomr.h stack.h memmap.h noomr_utils.h
-noomr_utils.o: noomr_utils.c noomr.h noomr_utils.h
-tests/%.o: tests/%.c dummy.h $(HEADERS)
-tests/stack_%: stack.h
+%.d: %.c
+	@echo "Creating dependency $@"
+	@$(CC) $(CFLAGS) -MM -o $@ $?
+-include $(ALL_SOURCE:.c=.d)
+
 
 # stack tests doesn't depend on the whole system -- special case
 tests/stack_%: tests/stack_%.c
@@ -47,4 +49,4 @@ test: $(TEST_BINARIES)
 	@ruby tests/test_runner.rb $(TEST_BINARIES)
 
 clean:
-	rm -f $(TEST_OBJECTS) $(TEST_BINARIES) $(OBJECTS) gmon.out $(LIBRARY)
+	rm -f $(TEST_OBJECTS) $(TEST_BINARIES) $(OBJECTS) gmon.out $(LIBRARY) $(ALL_SOURCE:.c=.d)
