@@ -357,6 +357,9 @@ void * noomr_calloc(size_t nmemb, size_t size) {
 
 void print_noomr_stats() {
 #ifdef COLLECT_STATS
+  if (!isatty(fileno(stderr))) {
+    return; // Do not print stats if output is redirected
+  }
   int index;
   setlocale(LC_ALL,"");
   printf("NOOMR stats\n");
