@@ -381,8 +381,6 @@ void print_noomr_stats() {
           (double) 0
 #endif
         );
-#else
-  printf("NOOMR not configured to collect statistics\n");
 #endif
 }
 
