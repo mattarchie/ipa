@@ -63,7 +63,7 @@ static int mmap_fd(int file_no, const char * subdir) {
     return -1;
   }
   char path[2048]; // 2 MB of path -- more than enough
-  unsigned written;
+  int written;
   // ensure the directory is present
   written = snprintf(&path[0], sizeof(path), "%s%d%s", "/tmp/bop/", getuniqueid(), subdir);
   if (written > sizeof(path) || written < 0) {
@@ -173,7 +173,7 @@ void allocate_header_page() {
         assert(last_page != (volatile header_page_t *) last_page->next);
         last_page = (header_page_t *) last_page->next;
       }
-    } while (!__sync_bool_compare_and_swap(&last_page->next, NULL, headers));
+    } while (!__sync_bool_compare_and_swap(&last_page->next, NULL, (volatile struct header_page_t *) headers));
     assert(headers != (volatile header_page_t *) headers->next);
     assert((volatile header_page_t *) last_page->next != last_page);
   }
