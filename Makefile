@@ -1,6 +1,7 @@
 ifneq ($(TRAVIS_CI), 1)
 	CC = gcc
 endif
+
 INCFLAGS = -I./ -I./noomr
 DEFS = -DNOOMR_ALIGN_HEADERS -DCOLLECT_STATS -DNOOMR_SYSTEM_ALLOC -DNO_HOOK
 OPT_FLAGS = -O3 -fno-strict-aliasing -fno-strict-overflow
@@ -20,7 +21,7 @@ LIBRARY = libnoomr.a
 
 default: $(LIBRARY)
 
-$(LIBRARY): $(OBJECTS)
+libnoomr.a: $(OBJECTS)
 	ar rcs $@ $?
 	ranlib $@
 
@@ -51,4 +52,6 @@ test: $(TEST_BINARIES)
 	@ruby tests/test_runner.rb $(TEST_BINARIES)
 
 clean:
-	rm -f $(TEST_OBJECTS) $(TEST_BINARIES) $(OBJECTS) gmon.out $(LIBRARY) $(DEP)
+	rm -f $(TEST_OBJECTS) $(TEST_BINARIES) $(OBJECTS) gmon.out $(LIBRARY)
+clobber:
+	rm -f $(DEP)

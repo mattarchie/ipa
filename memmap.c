@@ -18,6 +18,7 @@
 
 extern shared_data_t * shared;
 extern bool speculating(void);
+extern void noomr_init(void);
 
 
 static inline int mkdir_ne(char * path, int flags) {
@@ -53,6 +54,9 @@ static int rmkdir(char *dir) {
 }
 
 void * claim_region(size_t s) {
+  if (shared == NULL) {
+    noomr_init();
+  }
   int mmap_page_no = __sync_add_and_fetch(&shared->number_mmap, MAX(1, s / PAGE_SIZE));
   return (char *) (shared - (PAGE_SIZE * mmap_page_no));
 }
