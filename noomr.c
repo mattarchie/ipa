@@ -284,6 +284,9 @@ void * noomr_malloc(size_t size) {
       inc_heap(growth);
       getblock(payload(header))->header = (header_t *) header;
     }
+    if (getblock(payload(header))->header != header) {
+      getblock(payload(header))->header = (header_t *) header;
+    }
     assert(payload(header) != NULL);
     assert(getblock(payload(header))->header == header);
 #ifdef COLLECT_STATS
