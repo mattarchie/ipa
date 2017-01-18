@@ -238,11 +238,13 @@ void noomr_free(void * payload) {
 #ifdef COLLECT_STATS
   __sync_add_and_fetch(&shared->frees, 1);
 #endif
-  volatile header_t * header = getblock(payload)->header;
-
   if (payload == NULL) {
     return;
-  } else if (out_of_range(payload)) {
+  }
+  
+  volatile header_t * header = getblock(payload)->header;
+
+  if (out_of_range(payload)) {
     // A huge block is unmapped directly to kernel
     // This can be done immediately -- there is no re-allocation conflicts
     huge_block_t * block = gethugeblock(payload);
