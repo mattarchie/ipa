@@ -15,7 +15,7 @@ TEST_BINARIES = $(basename $(TEST_SOURCE))
 TEST_OBJECTS = $(patsubst %.c,%.o, $(TEST_SOURCE))
 DEP = $(SOURCE:.c=.d) $(TEST_SOURCE:.c=.d)
 
-OBJECTS = noomr.o memmap.o noomr_utils.o
+OBJECTS = noomr.o memmap.o noomr_utils.o noomr_sync.o
 LDFLAGS = -Wl,--no-as-needed -ldl -rdynamic -lm
 LIBRARY = libnoomr.a
 

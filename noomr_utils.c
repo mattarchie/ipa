@@ -23,16 +23,41 @@ void noomr_perror(const char * msg) {
   size_t tsize = snprintf(&master_buffer[0], sizeof(master_buffer), "%s: %s\n", msg, &error_buffer[0]);
   // Get
 
-  if (write(STDOUT_FILENO, &master_buffer[0], tsize) == -1) {
+  if (write(STDERR_FILENO, &master_buffer[0], tsize) == -1) {
     // TODO log the error somewhere where dynamically allocation won't break all of the things
   }
 }
 
+#include <locale.h>
+#include <math.h>
 
-static int increase_heap(size_t amount) {
-  return 0;
-}
-
-static int increase_mmap(size_t amount) {
-  return 0;
+void print_noomr_stats() {
+#ifdef COLLECT_STATS
+  if (!isatty(fileno(stderr))) {
+    return; // Do not print stats if output is redirected
+  }
+  int index;
+  setlocale(LC_ALL,"");
+  printf("NOOMR stats\n");
+  printf("allocations: %u\n", shared->allocations);
+  printf("frees: %u\n", shared->frees);
+  printf("sbrks: %u\n", shared->sbrks);
+  printf("huge allocations: %u\n", shared->huge_allocations);
+  printf("header pages: %u\n", shared->header_pages);
+  for (index = 0; index < NUM_CLASSES; index++) {
+    printf("class %2d (%'10lu B) allocations: %u\n", index, CLASS_TO_SIZE(index), shared->allocs_per_class[index]);
+  }
+  printf("Total managed memory:\n\t%'lu B\n\t%'.0lf pages\n\t%'.2lf GB\n\t%'.2lf TB\n",
+          (size_t) shared->total_alloc,
+          ceil(((double) shared->total_alloc) / PAGE_SIZE),
+          ((double) shared->total_alloc) / (1024L * 1024 * 1024),
+#if __WORDSIZE == 64
+          ((double) shared->total_alloc) / (1024L * 1024 * 1024 * 1024)
+#else
+          (double) 0
+#endif
+        );
+#else
+  printf("NOOMR not configured to collect statistics\n");
+#endif
 }

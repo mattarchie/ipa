@@ -68,6 +68,7 @@ typedef union {
     size_t size; // This be set once and not made globally visable until set
     volatile node_t seq_next;
     volatile node_t spec_next;
+    pid_t allocator;
   };
 } header_t;
 
@@ -133,6 +134,8 @@ typedef struct {
   volatile size_t number_mmap; // how many pages where mmaped (headers & large)
   volatile int dummy; // used in unit tests
 } shared_data_t;
+// Extern data
+extern shared_data_t * shared;
 
 // Function prototypes
 
