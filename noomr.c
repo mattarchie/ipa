@@ -62,7 +62,7 @@ size_t noomr_usable_space(void * payload) {
   if (payload == NULL) {
     return 0;
   } else if (out_of_range(payload)) {
-    return gethugeblock(payload)->huge_block_sz - sizeof(block_t);
+    return gethugeblock(payload)->huge_block_sz - sizeof(huge_block_t);
   } else {
     return getblock(payload)->header->size - sizeof(block_t);
   }
@@ -241,7 +241,7 @@ void noomr_free(void * payload) {
   if (payload == NULL) {
     return;
   }
-  
+
   volatile header_t * header = getblock(payload)->header;
 
   if (out_of_range(payload)) {
