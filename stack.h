@@ -35,24 +35,22 @@ static inline void init_stack(noomr_stack_t * stack) {
   stack->age = 0;
 }
 
-static inline noomr_stack_t atomic_stack_load(volatile noomr_stack_t * stack) {
-  noomr_stack_t loaded;
-  do {
-    loaded = *stack;
-  } while(!__sync_bool_compare_and_swap(&stack->combined,
-                                        loaded.combined,
-                                        loaded.combined));
-  return loaded;
-}
 // The function below can be used as a more light-weight 'semi-atomic' load without spinning
 //Loading the variable used to prevent the ABA problem first is suffient -- read barrier to prevent proc. reordering
-static inline noomr_stack_t naba_load(volatile noomr_stack_t * stack) {
+static noomr_stack_t naba_load(volatile noomr_stack_t * stack)  {
   noomr_stack_t load;
   load.age = stack->age;
-  __sync_synchronize(); // Need a barrier -- really only read but no good GCC binding
+#if defined(__x86_64__) || defined(__i386__)
+  // x86 has a strong enough memory model that a runtime memory fence is not needed.
+  // A compiler fence is needed to keep the compiler from reordering
+  // https://bartoszmilewski.com/2008/11/05/who-ordered-memory-fences-on-an-x86/``
+  asm volatile("": : :"memory");
+#else
+  // Need a barrier -- really only read but no good GCC binding
+  __sync_synchronize();
+#endif
   load.head = stack->head;
   return load;
-
 }
 
 static inline void push(volatile noomr_stack_t * stack, volatile node_t * item) {
