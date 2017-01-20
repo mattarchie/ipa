@@ -3,10 +3,10 @@ ifneq ($(TRAVIS_CI), 1)
 endif
 
 INCFLAGS = -I./ -I./noomr
-DEFS = -DNOOMR_ALIGN_HEADERS -DCOLLECT_STATS -DNOOMR_SYSTEM_ALLOC -DNO_HOOK
-OPT_FLAGS = -O3 -fno-strict-aliasing -fno-strict-overflow
-DEBUG_FLAGS = -ggdb3 -g3 -pg
-CFLAGS = $(OPT_FLAGS) $(DEBUG_FLAGS) -fPIC -Wall -Wno-unused-function -Wno-deprecated-declarations -march=native $(INCFLAGS) $(DEFS)
+DEFS = -UNOOMR_ALIGN_HEADERS -DCOLLECT_STATS -DNOOMR_SYSTEM_ALLOC -DNO_HOOK
+OPT_FLAGS = -O3 -fno-strict-aliasing -fno-strict-overflow -march=native
+DEBUG_FLAGS = -ggdb3 -g3
+CFLAGS = $(OPT_FLAGS) $(DEBUG_FLAGS) -fPIC -Wall -Wno-unused-function -Wno-deprecated-declarations -Wno-missing-braces $(INCFLAGS) $(DEFS)
 TEST_SOURCE = $(wildcard tests/*.c)
 SOURCE = $(wildcard *.c)
 ALL_SOURCE = $(TEST_SOURCE) $(SOURCE)
@@ -53,5 +53,5 @@ test: $(TEST_BINARIES)
 
 clean:
 	rm -f $(TEST_OBJECTS) $(TEST_BINARIES) $(OBJECTS) gmon.out $(LIBRARY)
-clobber:
+clobber: clean
 	rm -f $(DEP)
