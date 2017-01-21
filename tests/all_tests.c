@@ -3,7 +3,7 @@
 #include "noomr.h"
 #include "dummy.h"
 
-#define NUM_ROUNDS 5000
+#define NUM_ROUNDS 2500
 
 // Random number generation based off of http://www.azillionmonkeys.com/qed/random.html
 #define RS_SCALE (1.0 / (1.0 + RAND_MAX))
@@ -35,7 +35,9 @@ int main() {
   for (rnd = 0; rnd < NUM_ROUNDS; rnd++) {
     alloc_size = uniform_size_class();
     int * payload = noomr_malloc(alloc_size);
-    assert(noomr_usable_space(payload) >= alloc_size);
+    size_t usable = noomr_usable_space(payload);
+    assert(payload != NULL);
+    assert(usable >= alloc_size);
     ptrs[rnd] = payload;
     for (check = 0; check < rnd; check++) {
       if (ptrs[check] == payload) {

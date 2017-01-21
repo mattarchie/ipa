@@ -4,11 +4,7 @@
 #include <unistd.h>
 #include "noomr.h"
 
-#if __WORDSIZE == 64
-#define NUM_ROUNDS 429
-#else
 #define NUM_ROUNDS 50
-#endif
 
 // Random number generation based off of http://www.azillionmonkeys.com/qed/random.html
 #define RS_SCALE (1.0 / (1.0 + RAND_MAX))

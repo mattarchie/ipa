@@ -37,7 +37,7 @@ static inline void init_stack(noomr_stack_t * stack) {
 
 // The function below can be used as a more light-weight 'semi-atomic' load without spinning
 //Loading the variable used to prevent the ABA problem first is suffient -- read barrier to prevent proc. reordering
-static noomr_stack_t naba_load(volatile noomr_stack_t * stack)  {
+static inline noomr_stack_t naba_load(volatile noomr_stack_t * stack)  {
   noomr_stack_t load;
   load.age = stack->age;
 #if defined(__x86_64__) || defined(__i386__)
@@ -67,7 +67,7 @@ static inline void push(volatile noomr_stack_t * stack, volatile node_t * item) 
 
 static inline volatile node_t * pop(volatile noomr_stack_t * stack) {
   while (true) {
-    noomr_stack_t expected = *stack;
+    noomr_stack_t expected = naba_load(stack);
     if (expected.head == NULL) {
       return NULL;
     } else {
