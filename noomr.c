@@ -84,7 +84,7 @@ static void map_headers(char * begin, size_t index, size_t num_blocks) {
 
   for (i = 0; i < num_blocks; i++) {
     while(header_index >= (HEADERS_PER_PAGE - 1) || header_index == -1) {
-      for (page = shared->header_pg; page != NULL; page = (volatile header_page_t *) page->next) {
+      for (page = shared->header_pg; page != NULL; page = (volatile header_page_t *) page->next.next) {
         if (page->next_free < HEADERS_PER_PAGE - 1) {
           header_index = __sync_fetch_and_add(&page->next_free, 1);
           if (header_index < HEADERS_PER_PAGE) {

@@ -84,19 +84,37 @@ typedef union {
   and to fit the maximum number of headers as possible.
 */
 
-#define HEADERS_PER_PAGE ((PAGE_SIZE - \
-                          (sizeof(volatile struct header_page_t *) + sizeof(size_t)))  \
-                          / sizeof(header_t))
+#if __SIZEOF_POINTER__ == 8
+// 64b pointers
+#define combinded_header_next_t unsigned __int128
+#else
+#define combinded_header_next_t uint64_t
+#endif
 
+#define HEADERS_PER_PAGE ((PAGE_SIZE - \
+                          (sizeof(header_page_next_t) + sizeof(size_t)))  \
+                          / sizeof(header_t))
 //TODO need to include the ## (in path) for the next h pg
 // when looking up a header need to verify that the target is mapped in memory
 // this will use the same corrdination mechanisms as large allocations to ensure no conflicts
 typedef struct {
-  volatile struct header_page_t * next;
+  union {
+    struct {
+      volatile struct header_page_t * next;
+      int next_file_num; // NOT THE FILE DESCRIPTOR
+    };
+    combinded_header_next_t combined;
+  };
+} header_page_next_t;
+
+typedef struct {
+  header_page_next_t next;
   // unsigned number; // to be used used to help minimize the number of header pages?
   size_t next_free;
   header_t headers[HEADERS_PER_PAGE];
 } header_page_t;
+
+_Static_assert(sizeof(header_page_t) <= PAGE_SIZE, "Header pages not configured correctly");
 
 typedef struct {
   header_t * header;
@@ -134,6 +152,8 @@ typedef struct {
   volatile size_t number_mmap; // how many pages where mmaped (headers & large)
   volatile int dummy; // used in unit tests
 } shared_data_t;
+
+_Static_assert(sizeof(shared_data_t) <= PAGE_SIZE, "Shared data is larger than a page due to bad config");
 // Extern data
 extern shared_data_t * shared;
 

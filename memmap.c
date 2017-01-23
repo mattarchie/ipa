@@ -158,28 +158,43 @@ static inline void * allocate_noomr_page(noomr_page_t type, int file_no,
   return allocation;
 }
 
+static header_page_next_t free_pg_next = {
+  .next = NULL,
+  .next_file_num = 0
+};
+
 void allocate_header_page() {
-  int file_no = !speculating() ? -1 : __sync_add_and_fetch(&shared->header_num, 1);
+  header_page_next_t update;
+  const int file_no = !speculating() ? -1 : __sync_add_and_fetch(&shared->header_num, 1);
   header_page_t * headers = allocate_noomr_page(header_pg, file_no, PAGE_SIZE, MAP_SHARED);
   if (headers == (header_page_t *) -1) {
     exit(-1);
   }
   bzero(headers, PAGE_SIZE);
+  headers->next.next_file_num = 0;
   headers->next_free = 0;
   // Add increate_header_pgto the headers linked list
   if (shared->header_pg == NULL) {
     shared->header_pg = headers;
-    assert(shared->header_pg != (volatile header_page_t *) shared->header_pg->next);
+    assert(shared->header_pg != (volatile header_page_t *) shared->header_pg->next.next);
   } else {
+    update.next = (volatile struct header_page_t *) headers;
+    update.next_file_num = file_no;
+
     volatile header_page_t * last_page = shared->header_pg;
     do {
-      while (last_page->next != NULL) {
-        assert(last_page != (volatile header_page_t *) last_page->next);
-        last_page = (header_page_t *) last_page->next;
+
+      while (last_page->next.next != NULL) {
+        assert(last_page != (volatile header_page_t *) last_page->next.next);
+        last_page = (header_page_t *) last_page->next.next;
       }
-    } while (!__sync_bool_compare_and_swap(&last_page->next, NULL, (volatile struct header_page_t *) headers));
-    assert(headers != (volatile header_page_t *) headers->next);
-    assert((volatile header_page_t *) last_page->next != last_page);
+      // Load the relevant data into a new struct
+    } while (!__sync_bool_compare_and_swap(&last_page->next.combined,
+                                           free_pg_next.combined,
+                                           update.combined));
+
+    assert(headers != (volatile header_page_t *) headers->next.next);
+    assert((volatile header_page_t *) last_page->next.next != last_page);
   }
 #ifdef COLLECT_STATS
   __sync_add_and_fetch(&shared->header_pages, 1);
