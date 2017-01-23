@@ -66,7 +66,7 @@ static int mmap_fd(int file_no, const char * subdir) {
   if (!speculating()) {
     return -1;
   }
-  char path[2048]; // 2 MB of path -- more than enough
+  char path[2048]; // 2 kB of path -- more than enough
   int written;
   // ensure the directory is present
   written = snprintf(&path[0], sizeof(path), "%s%d%s", "/tmp/bop/", getuniqueid(), subdir);
