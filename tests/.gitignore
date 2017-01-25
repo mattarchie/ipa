@@ -1,3 +1,4 @@
+*.d
 stack_test
 test_allocate
 override
@@ -11,4 +12,5 @@ header_updates
 speculating_large
 fork_alloc
 all_tests
-*.d
+large_allocations
+performance

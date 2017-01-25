@@ -34,11 +34,12 @@ void endspec() {
 static inline void set_large_perm(int flags) {
   volatile huge_block_t * block;
   for (block = (huge_block_t *) shared->large_block; block != NULL; block = block->next_block) {
-    int fd = create_large_pg(block->file_name);
+    int fd = mmap_fd(block->file_name);
     fsync(fd);
     if (!mmap((void *) block, block->huge_block_sz, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0)) {
       noomr_perror("Unable to reconfigure permissions.");
     }
+    close(fd);
   }
 }
 
@@ -87,14 +88,7 @@ void promote_list() {
     // Ensure that PAGE is mapped in
     if (msync((void *) page, PAGE_SIZE, 0) == -1 && errno == ENOMEM) {
       // needs to be mapped in
-      char path[2048]; // 2 kB of path -- more than enough
-      int written;
-      // ensure the directory is present
-      written = snprintf(&path[0], sizeof(path), "%s%d%s%d", "/tmp/bop/", getuniqueid(), "/headers/", prev->next.next_file_num);
-      if (written > sizeof(path) || written < 0) {
-        noomr_perror("Unable to write directory name");
-      }
-      int fd = open(path, O_RDWR | O_CREAT | O_SYNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+      int fd = mmap_fd(prev->next.next_file_num);
       if (fd == -1) {
         noomr_perror("Unable to create the file.");
       }

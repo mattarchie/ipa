@@ -11,6 +11,7 @@
 #include "memmap.h"
 #include "stack.h"
 #include "noomr_utils.h"
+#include "timing.h"
 
 
 #define max(a, b) ((a) > (b) ? (a) : (b))
@@ -169,6 +170,7 @@ void * noomr_malloc(size_t size) {
   }
 #ifdef COLLECT_STATS
   __sync_add_and_fetch(&shared->allocations, 1);
+  struct timespec start = timer_start();
 #endif
   if (size == 0) {
     return NULL;
@@ -222,6 +224,7 @@ void * noomr_malloc(size_t size) {
     assert(payload(header) != NULL);
     assert(getblock(payload(header))->header == header);
 #ifdef COLLECT_STATS
+      __sync_add_and_fetch(&shared->time_malloc, timer_end(start));
       __sync_add_and_fetch(&shared->allocs_per_class[class_for_size(aligned)], 1);
 #endif
     record_mode_alloc(header);

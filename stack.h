@@ -39,17 +39,20 @@ static inline void init_stack(noomr_stack_t * stack) {
 //Loading the variable used to prevent the ABA problem first is suffient -- read barrier to prevent proc. reordering
 static inline noomr_stack_t naba_load(volatile noomr_stack_t * stack)  {
   noomr_stack_t load;
-  load.age = stack->age;
 #if defined(__x86_64__) || defined(__i386__)
   // x86 has a strong enough memory model that a runtime memory fence is not needed.
   // A compiler fence is needed to keep the compiler from reordering
-  // https://bartoszmilewski.com/2008/11/05/who-ordered-memory-fences-on-an-x86/``
+  // https://bartoszmilewski.com/2008/11/05/who-ordered-memory-fences-on-an-x86/
   asm volatile("": : :"memory");
+  load.age = stack->age;
+  asm volatile("": : :"memory");
+  load.head = stack->head;
 #else
   // Need a barrier -- really only read but no good GCC binding
+  load.age = stack->age;
   __sync_synchronize();
-#endif
   load.head = stack->head;
+#endif
   return load;
 }
 

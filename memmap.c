@@ -12,8 +12,8 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <errno.h>
-#include "memmap.h"
 #include "noomr.h"
+#include "memmap.h"
 #include "noomr_utils.h"
 
 extern shared_data_t * shared;
@@ -53,23 +53,19 @@ static int rmkdir(char *dir) {
   return mkdir_ne(tmp, S_IRWXU);
 }
 
-void * claim_region(size_t s) {
-  if (shared == NULL) {
-    noomr_init();
-  }
-  int mmap_page_no = __sync_add_and_fetch(&shared->number_mmap, MAX(1, s / PAGE_SIZE));
-  return (char *) (shared - (PAGE_SIZE * mmap_page_no));
-}
-
-/** NB: We cannot use perror -- it internally calls malloc*/
-static int mmap_fd(int file_no, const char * subdir) {
+/**
+ * Open a file descriptor NAMED file_no for later use by mmap
+ * @param  file_no [description]
+ * @return         [description]
+ */
+int mmap_fd(unsigned file_no) {
   if (!speculating()) {
     return -1;
   }
   char path[2048]; // 2 kB of path -- more than enough
   int written;
   // ensure the directory is present
-  written = snprintf(&path[0], sizeof(path), "%s%d%s", "/tmp/bop/", getuniqueid(), subdir);
+  written = snprintf(&path[0], sizeof(path), "%s%d/", "/tmp/bop/", getuniqueid());
   if (written > sizeof(path) || written < 0) {
     noomr_perror("Unable to write directory name");
   }
@@ -78,7 +74,7 @@ static int mmap_fd(int file_no, const char * subdir) {
     noomr_perror("Unable to make the directory");
   }
   // now create the file
-  written = snprintf(&path[0], sizeof(path), "%s%d%s%d", "/tmp/bop/", getuniqueid(), subdir, file_no);
+  written = snprintf(&path[0], sizeof(path), "%s%d/%u", "/tmp/bop/", getuniqueid(), file_no);
   if (written > sizeof(path) || written < 0) {
     noomr_perror("Unable to write the output path");
   }
@@ -94,32 +90,68 @@ static int mmap_fd(int file_no, const char * subdir) {
   }
   return fd;
 }
-int create_header_pg(int file_no) {
-  return mmap_fd(file_no, "/headers/");
+
+static inline bool is_mapped(void * ptr) {
+  return !(msync((void *) ptr, 1, MS_ASYNC) == -1 && errno == ENOMEM);
 }
 
-int create_large_pg(int file_no) {
-  return mmap_fd(file_no, "/large/");
+static inline size_t get_size_fd(int fd) {
+  struct stat st;
+  if (fstat(fd, &st) == -1) {
+    noomr_perror("Unable to get size of file");
+  }
+  return st.st_size;
 }
 
-typedef enum {
-  large_alloc,
-  header_pg
-} noomr_page_t;
+// Map all missing pages
+// Returns the last non-null page (eg. the one with the next page filed set to null)
+noomr_page_t * map_missing_pages() {
+  static noomr_page_t * cache = NULL; // cache == NULL ? &shared->next_page : cache
+  noomr_page_t * last_page;
+  volatile size_t rounds = 0;
+#define SANITY_SIZE 10000
+  noomr_page_t * sanity[SANITY_SIZE];
+  bzero(&sanity, sizeof(sanity));
+  for (last_page = cache == NULL ? &shared->next_page : cache; last_page->next_page != NULL; last_page = (noomr_page_t *) last_page->next_page) {
+    if (rounds < SANITY_SIZE) {
+      sanity[rounds] = last_page;
+      rounds++;
+      for (int i = 0; false && i < MIN(rounds, SANITY_SIZE); i++) {
+        assert(last_page != sanity[rounds]);
+      }
+    } else {
+      rounds++;
+    }
+    if (!is_mapped((void *) last_page->next_page)) {
+      assert(last_page->next_pg_name != -1);
+      int fd = mmap_fd(last_page->next_pg_name);
+      if (fd == -1) {
+        // TODO handle error
+      } else {
+        size_t size = get_size_fd(fd);
+        if (mmap((void *) last_page->next_page, size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, fd, 0) == MAP_FAILED) {
+          // TODO handle error
+          abort();
+        }
+        close(fd); // think can do here
+      }
+    }
+  }
+  return cache = last_page;
+}
 
 /**
  * MMap a page according to @type
  *
  * @method allocate_noomr_page
  *
- * @param  type                the type of page to allocate
  * @param  minsize             the minimal size of the allocation, including any headers
  * @param  flags               baseline flags to pass to mmap, MAP_FIXED always added,
  *                             	MAP_ANONYMOUS while not speculating
  */
-static inline void * allocate_noomr_page(noomr_page_t type, int file_no,
-                                         size_t minsize, int flags) {
+static inline void * allocate_noomr_page(int file_no, size_t minsize, int flags) {
   void * allocation = NULL;
+  noomr_page_t alloc, expected = {0};
   // Reserve the resources in shared for this allocation
   int file_descriptor;
   size_t allocation_size = MAX(minsize, PAGE_SIZE);
@@ -128,28 +160,32 @@ static inline void * allocate_noomr_page(noomr_page_t type, int file_no,
 #ifdef COLLECT_STATS
   __sync_add_and_fetch(&shared->total_alloc, allocation_size);
 #endif
-  char * destination = claim_region(allocation_size);
   if (!speculating()) {
     flags |= MAP_ANONYMOUS;
   }
-  switch(type) {
-    case header_pg:
-      file_descriptor = create_header_pg(file_no);
-      break;
-    case large_alloc:
-      file_descriptor = create_large_pg(file_no);
-      break;
-    default:
-      fprintf(stderr, "Unable to create file descriptor for %d\n", type);
-      file_descriptor = -1;
-      break;
+  file_descriptor = mmap_fd(file_no);
+  noomr_page_t * last_page;
+  while (true) {
+    last_page = map_missing_pages();
+    /**
+     * Let the kernel decide where to put the new page(s)
+     * Tasks communicate by requiring the CAS to succeed. If it fails
+     * then some other task allocated its page
+     */
+    allocation = mmap(NULL, allocation_size, PROT_READ | PROT_WRITE, flags, file_descriptor, 0);
+    if (allocation == (void *) -1) {
+      noomr_perror("Unable to set up mmap page");
+      continue;
+    }
+    alloc.next_page = allocation;
+    alloc.next_pg_name = file_no;
+    if (__sync_bool_compare_and_swap(&last_page->combined, expected.combined, alloc.combined)) {
+      goto checks;
+    } else {
+      munmap(allocation, allocation_size);
+    }
   }
-  allocation = mmap(destination, allocation_size, PROT_READ | PROT_WRITE, flags | MAP_FIXED, file_descriptor, 0);
-  if (allocation == (void *) -1) {
-    noomr_perror("Unable to set up mmap page");
-  } else if (allocation != destination) {
-    noomr_perror("Unable to mmap to the required location");
-  }
+  checks:
   if (file_descriptor != -1) {
     if (close(file_descriptor)) {
       noomr_perror("Unable to close file descriptor");
@@ -165,8 +201,8 @@ static header_page_next_t free_pg_next = {
 
 void allocate_header_page() {
   header_page_next_t update;
-  const int file_no = !speculating() ? -1 : __sync_add_and_fetch(&shared->header_num, 1);
-  header_page_t * headers = allocate_noomr_page(header_pg, file_no, PAGE_SIZE, MAP_SHARED);
+  const int file_no = !speculating() ? -1 : __sync_add_and_fetch(&shared->next_name, 1);
+  header_page_t * headers = allocate_noomr_page(file_no, PAGE_SIZE, MAP_SHARED);
   if (headers == (header_page_t *) -1) {
     exit(-1);
   }
@@ -202,12 +238,12 @@ void allocate_header_page() {
 }
 
 void * allocate_large(size_t size) {
-  int file_no = !speculating() ? -1 : __sync_add_and_fetch(&shared->large_num, 1);
+  int file_no = !speculating() ? -1 : __sync_add_and_fetch(&shared->next_name, 1);
   // Align to a page size
   size_t alloc_size = PAGE_ALIGN((size + sizeof(huge_block_t)));
   assert(alloc_size > size);
   assert(alloc_size % PAGE_SIZE == 0);
-  huge_block_t * block = allocate_noomr_page(large_alloc, file_no, alloc_size, MAP_PRIVATE);
+  huge_block_t * block = allocate_noomr_page(file_no, alloc_size, MAP_PRIVATE);
   if (block == (huge_block_t *) -1) {
     return NULL;
   }

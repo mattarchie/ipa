@@ -5,7 +5,7 @@
 #include <math.h>
 #include <assert.h>
 #include "stack.h"
-
+#include "memmap.h"
 
 #if __WORDSIZE == 64
 #define ALIGNMENT (8) // I think?
@@ -48,7 +48,7 @@ static inline size_t __size_to_class(unsigned x) {
   return class_sizes[x];
 }
 
-static inline size_t class_for_size(unsigned x) {
+static inline const size_t class_for_size(unsigned x) {
   size_t s;
   for (s = 0; s < NUM_CLASSES; s++) {
     if (class_sizes[s] >= x) {
@@ -92,11 +92,8 @@ typedef union {
 #endif
 
 #define HEADERS_PER_PAGE ((PAGE_SIZE - \
-                          (sizeof(header_page_next_t) + sizeof(size_t)))  \
+                          (sizeof(header_page_next_t) + sizeof(size_t) + sizeof(noomr_page_t)))  \
                           / sizeof(header_t))
-//TODO need to include the ## (in path) for the next h pg
-// when looking up a header need to verify that the target is mapped in memory
-// this will use the same corrdination mechanisms as large allocations to ensure no conflicts
 typedef struct {
   union {
     struct {
@@ -108,6 +105,7 @@ typedef struct {
 } header_page_next_t;
 
 typedef struct {
+  noomr_page_t next_page;
   header_page_next_t next;
   // unsigned number; // to be used used to help minimize the number of header pages?
   size_t next_free;
@@ -121,9 +119,10 @@ typedef struct {
 } block_t;
 
 typedef struct {
+  noomr_page_t next_page;
   size_t huge_block_sz; //Note: this includes the block_t space
-  volatile void * next_block;
-  int file_name;
+  volatile void * next_block; // Might be able to eliminate this
+  int file_name; // Might be able to eliminate this field
 } huge_block_t;
 
 
@@ -132,6 +131,7 @@ typedef unsigned line_int_t __attribute__ ((aligned (64))); //64B aligned int
 
 // Allocated at the start of the program in shared mem.
 typedef struct {
+  noomr_page_t next_page;
 #ifdef COLLECT_STATS
   volatile line_int_t allocations;
   volatile line_int_t frees;
@@ -140,13 +140,13 @@ typedef struct {
   volatile line_int_t huge_allocations;
   volatile line_int_t header_pages;
   volatile size_t total_alloc; // total space allocated from the system (heap + mmap)
+  volatile unsigned long time_malloc;
 #endif
   volatile noomr_stack_t seq_free[NUM_CLASSES]; // sequential free list
   volatile noomr_stack_t spec_free[NUM_CLASSES]; // speculative free list
   volatile size_t base; //where segment begins (cache)
   volatile size_t spec_growth; // grow (B) done by spec group
-  volatile unsigned header_num; // next header file to use
-  volatile unsigned large_num; // next file for large allocation
+  volatile unsigned next_name; // next header file to use
   volatile header_page_t * header_pg; // the address of the first header mmap page
   volatile huge_block_t * large_block; // pointer into the list of large blocks
   volatile size_t number_mmap; // how many pages where mmaped (headers & large)

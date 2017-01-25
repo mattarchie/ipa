@@ -22,8 +22,9 @@ LIBRARY = libnoomr.a
 default: $(LIBRARY)
 
 libnoomr.a: $(OBJECTS)
-	ar rcs $@ $?
-	ranlib $@
+	@echo Building library $@
+	@ar rcs $@ $?
+	@ranlib $@
 
 %.d: %.c
 	@echo "Creating dependency $@"
@@ -48,8 +49,8 @@ tests: $(TEST_OBJECTS) $(TEST_BINARIES)
 # NOTE: Tests objects is listed as a dependency so make will not auto-remove them
 
 test: $(TEST_BINARIES)
-	@echo Test binaries: $(notdir $(TEST_BINARIES))
-	@ruby tests/test_runner.rb $(TEST_BINARIES)
+	@echo Test binaries: $(sort $(notdir $(TEST_BINARIES)))
+	ruby tests/test_runner.rb $(sort $(TEST_BINARIES))
 
 clean:
 	rm -f $(TEST_OBJECTS) $(TEST_BINARIES) $(OBJECTS) gmon.out $(LIBRARY)

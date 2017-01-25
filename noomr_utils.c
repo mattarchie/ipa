@@ -7,6 +7,9 @@
 #include <unistd.h>
 #include <errno.h>
 #include "noomr.h"
+#include "timing.h" // Used for the time to seconds macro
+
+// Require placing data in user-supplied buffer
 
 void noomr_strerr(char * buffer, size_t len) {
   // For now, no error handling
@@ -44,6 +47,9 @@ void print_noomr_stats() {
   printf("sbrks: %u\n", snapshot.sbrks);
   printf("huge allocations: %u\n", snapshot.huge_allocations);
   printf("header pages: %u\n", snapshot.header_pages);
+  printf("Time spent allocating: %'lu ns (%'.5lf s)\n", snapshot.time_malloc, TIME_TO_SEC(snapshot.time_malloc));
+  double average = ((double) snapshot.time_malloc) / snapshot.allocations;
+  printf("Average time per allocation: %'.2lf ns\n", average);
   for (index = 0; index < NUM_CLASSES; index++) {
     printf("class %2d (%'10lu B) allocations: %u\n", index, CLASS_TO_SIZE(index), snapshot.allocs_per_class[index]);
   }
@@ -52,7 +58,7 @@ void print_noomr_stats() {
           ceil(((double) snapshot.total_alloc) / PAGE_SIZE),
           ((double) snapshot.total_alloc) / (1024L * 1024 * 1024),
 #if __WORDSIZE == 64
-          ((double) snapshot.total_alloc) / (1024L * 1024 * 1024 * 1024)
+          ((double) shared->total_alloc) / (1024L * 1024 * 1024 * 1024)
 #else
           (double) 0
 #endif
