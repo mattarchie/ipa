@@ -7,7 +7,6 @@
 #include <unistd.h>
 #include <errno.h>
 #include "noomr.h"
-// Require placing data in user-supplied buffer
 
 void noomr_strerr(char * buffer, size_t len) {
   // For now, no error handling
@@ -33,26 +32,27 @@ void noomr_perror(const char * msg) {
 
 void print_noomr_stats() {
 #ifdef COLLECT_STATS
+  shared_data_t snapshot = *shared;
   if (!isatty(fileno(stderr))) {
     return; // Do not print stats if output is redirected
   }
   int index;
   setlocale(LC_ALL,"");
   printf("NOOMR stats\n");
-  printf("allocations: %u\n", shared->allocations);
-  printf("frees: %u\n", shared->frees);
-  printf("sbrks: %u\n", shared->sbrks);
-  printf("huge allocations: %u\n", shared->huge_allocations);
-  printf("header pages: %u\n", shared->header_pages);
+  printf("allocations: %u\n", snapshot.allocations);
+  printf("frees: %u\n", snapshot.frees);
+  printf("sbrks: %u\n", snapshot.sbrks);
+  printf("huge allocations: %u\n", snapshot.huge_allocations);
+  printf("header pages: %u\n", snapshot.header_pages);
   for (index = 0; index < NUM_CLASSES; index++) {
-    printf("class %2d (%'10lu B) allocations: %u\n", index, CLASS_TO_SIZE(index), shared->allocs_per_class[index]);
+    printf("class %2d (%'10lu B) allocations: %u\n", index, CLASS_TO_SIZE(index), snapshot.allocs_per_class[index]);
   }
   printf("Total managed memory:\n\t%'lu B\n\t%'.0lf pages\n\t%'.2lf GB\n\t%'.2lf TB\n",
-          (size_t) shared->total_alloc,
-          ceil(((double) shared->total_alloc) / PAGE_SIZE),
-          ((double) shared->total_alloc) / (1024L * 1024 * 1024),
+          (size_t) snapshot.total_alloc,
+          ceil(((double) snapshot.total_alloc) / PAGE_SIZE),
+          ((double) snapshot.total_alloc) / (1024L * 1024 * 1024),
 #if __WORDSIZE == 64
-          ((double) shared->total_alloc) / (1024L * 1024 * 1024 * 1024)
+          ((double) snapshot.total_alloc) / (1024L * 1024 * 1024 * 1024)
 #else
           (double) 0
 #endif
