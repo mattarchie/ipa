@@ -7,7 +7,7 @@ DEFS = -UNOOMR_ALIGN_HEADERS -DCOLLECT_STATS -DNOOMR_SYSTEM_ALLOC -DNO_HOOK
 OPT_FLAGS = -O3 -fno-strict-aliasing -fno-strict-overflow -march=native
 DEBUG_FLAGS = -ggdb3 -g3
 CFLAGS = $(OPT_FLAGS) $(DEBUG_FLAGS) -fPIC -Wall -Wno-unused-function -Wno-deprecated-declarations -Wno-missing-braces $(INCFLAGS) $(DEFS)
-TEST_SOURCE = $(wildcard tests/*.c)
+TEST_SOURCE = $(wildcard tests/*.c) $(wildcard tests/parallel/*.c)
 SOURCE = $(wildcard *.c)
 ALL_SOURCE = $(TEST_SOURCE) $(SOURCE)
 HEADERS = $(wildcard *.h)
@@ -31,6 +31,10 @@ libnoomr.a: $(OBJECTS)
 	@$(CC) $(CFLAGS) -MM -o $@ $?
 -include $(DEP)
 
+
+tests/parallel/stack_%: tests/parallel/stack_%.c
+	@echo "Linking $@"
+	@$(CC) $(CFLAGS) -pthread $? -o $@ $(LDFLAGS)
 
 # stack tests doesn't depend on the whole system -- special case
 tests/stack_%: tests/stack_%.c
