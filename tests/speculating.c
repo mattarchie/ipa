@@ -5,7 +5,7 @@
 #include "noomr.h"
 
 #if __WORDSIZE == 64
-#define NUM_ROUNDS 100000
+#define NUM_ROUNDS 200
 #else
 #define NUM_ROUNDS 5
 #endif

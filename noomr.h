@@ -153,7 +153,6 @@ typedef struct {
   volatile int dummy; // used in unit tests
 } shared_data_t;
 
-_Static_assert(sizeof(shared_data_t) <= PAGE_SIZE, "Shared data is larger than a page due to bad config");
 // Extern data
 extern shared_data_t * shared;
 
