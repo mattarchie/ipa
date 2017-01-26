@@ -1,5 +1,5 @@
 ifneq ($(TRAVIS_CI), 1)
-	CC = gcc
+	CC = clang
 endif
 
 INCFLAGS = -I./ -I./noomr
