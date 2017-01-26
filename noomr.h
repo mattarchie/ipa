@@ -219,11 +219,19 @@ static inline void record_mode_free(volatile header_t * header) {
                 (type *)( (char *)__mptr - __builtin_offsetof(type,member) );})
 
 static inline volatile header_t * spec_node_to_header(volatile node_t * node) {
-  return container_of(node, volatile header_t, spec_next);
+  if (node == NULL) {
+    return NULL;
+  } else {
+    return container_of(node, volatile header_t, spec_next);
+  }
 }
 
 static inline volatile header_t * seq_node_to_header(volatile node_t * node) {
-  return container_of(node, volatile header_t, seq_next);
+  if (node == NULL) {
+    return NULL;
+  } else {
+    return container_of(node, volatile header_t, seq_next);
+  }
 }
 
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
