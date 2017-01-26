@@ -2,7 +2,6 @@
 #define ___HAVE_NOOMR_MMAP_H
 #include <stdbool.h>
 #include <stdlib.h>
-#include "noomr.h"
 
 #if __SIZEOF_POINTER__ == 8
 // 64b pointers
@@ -25,11 +24,6 @@ void allocate_header_page(void);
 void* allocate_large(size_t);
 int getuniqueid(void);
 int mmap_fd(unsigned name);
-void map_missing_pages(void);
-bool is_mapped(void *);
-void map_page_now(volatile noomr_page_t *);
-volatile noomr_page_t * map_missing_headers(void);
-volatile noomr_page_t * map_missing_blocks(void);
-
+noomr_page_t * map_missing_pages(void);
 
 #endif

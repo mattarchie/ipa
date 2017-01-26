@@ -105,7 +105,8 @@ typedef struct {
 } header_page_next_t;
 
 typedef struct {
-  noomr_page_t next;
+  noomr_page_t next_page;
+  header_page_next_t next;
   // unsigned number; // to be used used to help minimize the number of header pages?
   size_t next_free;
   header_t headers[HEADERS_PER_PAGE];
@@ -118,9 +119,10 @@ typedef struct {
 } block_t;
 
 typedef struct {
-  noomr_page_t next;
-  size_t huge_block_sz;
-  int my_name;
+  noomr_page_t next_page;
+  size_t huge_block_sz; //Note: this includes the block_t space
+  volatile void * next_block; // Might be able to eliminate this
+  int file_name; // Might be able to eliminate this field
 } huge_block_t;
 
 
@@ -129,6 +131,7 @@ typedef unsigned line_int_t __attribute__ ((aligned (64))); //64B aligned int
 
 // Allocated at the start of the program in shared mem.
 typedef struct {
+  noomr_page_t next_page;
 #ifdef COLLECT_STATS
   volatile line_int_t allocations;
   volatile line_int_t frees;
@@ -144,12 +147,9 @@ typedef struct {
   volatile size_t base; //where segment begins (cache)
   volatile size_t spec_growth; // grow (B) done by spec group
   volatile unsigned next_name; // next header file to use
-  // volatile header_page_t * header_pg; // the address of the first header mmap page
-  // volatile huge_block_t * large_block; // pointer into the list of large blocks
+  volatile header_page_t * header_pg; // the address of the first header mmap page
+  volatile huge_block_t * large_block; // pointer into the list of large blocks
   volatile size_t number_mmap; // how many pages where mmaped (headers & large)
-  volatile size_t num_headers;
-  volatile noomr_page_t next_header;
-  volatile noomr_page_t next_large;
   volatile int dummy; // used in unit tests
 } shared_data_t;
 
@@ -180,6 +180,7 @@ static void * getpayload(volatile block_t * block) {
 static void * gethugepayload(volatile huge_block_t * block) {
   return (void *) (((char*) block) + sizeof(huge_block_t));
 }
+
 
 #define SPEC_ALLOC_B (1<<0)
 #define SEQ_ALLOC_B (1<<1)
@@ -218,51 +219,11 @@ static inline void record_mode_free(volatile header_t * header) {
                 (type *)( (char *)__mptr - __builtin_offsetof(type,member) );})
 
 static inline volatile header_t * spec_node_to_header(volatile node_t * node) {
-  if (node == NULL) {
-    return NULL;
-  } else {
-    return container_of(node, volatile header_t, spec_next);
-  }
+  return container_of(node, volatile header_t, spec_next);
 }
 
 static inline volatile header_t * seq_node_to_header(volatile node_t * node) {
-  if (node == NULL) {
-    return NULL;
-  } else {
-    return container_of(node, volatile header_t, seq_next);
-  }
-}
-
-static inline volatile header_page_t * to_header_page(volatile noomr_page_t * page) {
-  if (page == NULL) {
-    return NULL;
-  } else {
-    return container_of(page, volatile header_page_t, next);
-  }
-}
-
-static inline volatile huge_block_t * to_large_alloc(volatile noomr_page_t * page) {
-  if (page == NULL) {
-    return NULL;
-  } else {
-    return container_of(page, volatile huge_block_t, next);
-  }
-}
-
-static inline volatile header_page_t * next_header_pg(volatile header_page_t * page) {
-  if (page->next.next_page == NULL) {
-    return NULL;
-  } else {
-    return container_of((noomr_page_t *) page->next.next_page, volatile header_page_t, next);
-  }
-}
-
-static inline volatile huge_block_t * next_huge(volatile huge_block_t * huge) {
-  if (huge->next.next_page == NULL) {
-    return NULL;
-  } else {
-    return container_of((noomr_page_t *) huge->next.next_page, volatile huge_block_t, next);
-  }
+  return container_of(node, volatile header_t, seq_next);
 }
 
 #define MIN(a,b) ((a) < (b) ? (a) : (b))

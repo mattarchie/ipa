@@ -34,23 +34,19 @@ static header_t * lookup_header(void * user_payload) {
   return out_of_range(user_payload) ? NULL : getblock(user_payload)->header;
 }
 
-static inline noomr_page_t * to_page(volatile void * p) {
-  return (noomr_page_t *) (((size_t) p) & ~(PAGE_SIZE - 1));
-}
-
-static inline volatile header_t * alloc_pop(size_t size) {
+static inline volatile node_t * alloc_pop(size_t size) {
   size_t index = SIZE_TO_CLASS(size);
   assert(index >= 0 && index < NUM_CLASSES);
   if (speculating()) {
     if (!empty(&delayed_frees_reclaimable[index])) {
-      return spec_node_to_header(pop_ageless(&delayed_frees_reclaimable[index]));
+      return pop_ageless(&delayed_frees_reclaimable[index]);
     } else {
-      return spec_node_to_header(pop(&shared->spec_free[index]));
+      return pop(&shared->spec_free[index]);
     }
   } else {
     // In CBOP, the monitor proces and the worker process will be using the
     // sequential free list -- need synchronization
-     return seq_node_to_header(pop(&shared->seq_free[index]));
+    return pop(&shared->seq_free[index]);
   }
 }
 
@@ -84,17 +80,12 @@ static void map_headers(char * begin, size_t index, size_t num_blocks) {
   size_t block_size = CLASS_TO_SIZE(index);
   volatile noomr_stack_t * spec_stack = &shared->spec_free[index];
   volatile noomr_stack_t * seq_stack = &shared->seq_free[index];
-  noomr_stack_t * local_stack = &delayed_frees_reclaimable[index];
   volatile block_t * block;
   assert(block_size == ALIGN(block_size));
 
   for (i = 0; i < num_blocks; i++) {
     while(header_index >= (HEADERS_PER_PAGE - 1) || header_index == -1) {
-      for (page = (volatile header_page_t *) shared->next_header.next_page; page != NULL; page = next_header_pg(page)) {
-        // First we must make sure that page is mapped in
-        if (speculating() && !is_mapped(to_page(page))) {
-            map_missing_headers();
-        }
+      for (page = shared->header_pg; page != NULL; page = (volatile header_page_t *) page->next.next) {
         if (page->next_free < HEADERS_PER_PAGE - 1) {
           header_index = __sync_fetch_and_add(&page->next_free, 1);
           if (header_index < HEADERS_PER_PAGE) {
@@ -113,26 +104,22 @@ static void map_headers(char * begin, size_t index, size_t num_blocks) {
     page->headers[header_index].spec_next.next = NULL;
     page->headers[header_index].seq_next.next = NULL;
     page->headers[header_index].payload = getpayload(block);
-    assert(page->headers[header_index].payload != NULL);
 
     block->header = (header_t * ) &page->headers[header_index];
     // (in)sanity checks
     assert(getblock(getpayload(block)) == block);
     assert(getblock(getpayload(block))->header == &page->headers[header_index]);
     assert(payload(&page->headers[header_index]) == getpayload(block));
-    assert(payload(&page->headers[header_index]) != NULL);
 
-    if (speculating()) {
-      push_ageless(local_stack, (node_t *) &page->headers[header_index].spec_next);
-    } else {
-      __sync_synchronize(); // mem fence
-      push(seq_stack, (node_t * ) &page->headers[header_index].seq_next);
-      push(spec_stack, (node_t * ) &page->headers[header_index].spec_next);
-    }
+    __sync_synchronize(); // mem fence
+    push(seq_stack, (node_t * ) &page->headers[header_index].seq_next);
+    push(spec_stack, (node_t * ) &page->headers[header_index].spec_next);
     // get the i-block
     header_index = -1;
   }
 }
+
+
 
 void noomr_init() {
   if (shared == NULL) {
@@ -145,6 +132,7 @@ void noomr_init() {
 #endif
   }
 }
+
 
 static inline volatile header_t * convert_head_mode_aware(volatile node_t * node) {
   if (speculating()) {
@@ -173,30 +161,9 @@ size_t stack_for_size(size_t min_size) {
   return CLASS_TO_SIZE(klass);
 }
 
-static void grow(size_t aligned) {
-  // Need to grow the space
-  size_t index = class_for_size(aligned);
-  size_t size = CLASS_TO_SIZE(index);
-  assert(size > 0);
-  size_t blocks = MIN(HEADERS_PER_PAGE, max(1024 / size, 15));
-
-  size_t my_region_size = size * blocks;
-  if (speculating()) {
-    // first allocate the extra space that's needed. Don't record the to allocation
-    inc_heap(__sync_add_and_fetch(&shared->spec_growth, my_region_size) - my_growth - my_region_size);
-    __sync_add_and_fetch(&my_growth, size * blocks);
-  }
-  // Grow the heap by the space needed for my allocations
-  char * base = inc_heap(my_region_size);
-  if (speculating()) {
-    record_allocation(base, my_region_size);
-  }
-  // now map headers for my new (private) address region
-  map_headers(base, index, blocks);
-}
-
 void * noomr_malloc(size_t size) {
   volatile header_t * header;
+  volatile node_t * stack_node;
   size_t aligned = ALIGN(size + sizeof(block_t));
   if (shared == NULL) {
     noomr_init();
@@ -217,17 +184,37 @@ void * noomr_malloc(size_t size) {
     return block;
   } else {
     alloc:
-    header = alloc_pop(aligned);
-    if (! header) {
-      grow(aligned);
+    stack_node = alloc_pop(aligned);
+    if (! stack_node) {
+      // Need to grow the space
+      size_t index = class_for_size(aligned);
+      size_t size = CLASS_TO_SIZE(index);
+      assert(size > 0);
+      size_t blocks = MIN(HEADERS_PER_PAGE, max(1024 / size, 15));
+
+      size_t my_region_size = size * blocks;
+      if (speculating()) {
+        // first allocate the extra space that's needed. Don't record the to allocation
+        inc_heap(__sync_add_and_fetch(&shared->spec_growth, my_region_size) - my_growth - my_region_size);
+        __sync_add_and_fetch(&my_growth, size * blocks);
+      }
+      // Grow the heap by the space needed for my allocations
+      char * base = inc_heap(my_region_size);
+      if (speculating()) {
+        record_allocation(base, my_region_size);
+      }
+      // now map headers for my new (private) address region
+      map_headers(base, index, blocks);
       goto alloc;
     }
-    assert(payload(header) != NULL);
+    header = convert_head_mode_aware(stack_node);
     // Ensure that the payload is in my allocated memory
     while (out_of_range(payload(header))) {
       // heap needs to extend to header->payload + header->size
-      size_t growth = shared->spec_growth - my_growth;
-      my_growth += growth;
+      size_t growth = (((size_t) payload(header)) + header->size) - (size_t) sbrk(0);
+      // if (speculating()) {
+      //   my_growth += growth;
+      // }
       inc_heap(growth);
       getblock(payload(header))->header = (header_t *) header;
     }

@@ -32,12 +32,13 @@ void noomr_perror(const char * msg) {
 
 #include <locale.h>
 #include <math.h>
+
 void print_noomr_stats() {
 #ifdef COLLECT_STATS
-  if (!isatty(fileno(stderr)) || shared == NULL) {
+  shared_data_t snapshot = *shared;
+  if (!isatty(fileno(stderr))) {
     return; // Do not print stats if output is redirected
   }
-  shared_data_t snapshot = *shared;
   int index;
   setlocale(LC_ALL,"");
   printf("NOOMR stats\n");
