@@ -70,7 +70,7 @@ static inline void push(volatile noomr_stack_t * stack, volatile node_t * item) 
 
 static inline volatile node_t * pop(volatile noomr_stack_t * stack) {
   while (true) {
-    noomr_stack_t expected = naba_load(stack);
+    volatile noomr_stack_t expected = naba_load(stack);
     if (expected.head == NULL) {
       return NULL;
     } else {

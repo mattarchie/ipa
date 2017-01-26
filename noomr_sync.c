@@ -33,13 +33,18 @@ void endspec() {
 
 static inline void set_large_perm(int flags) {
   volatile huge_block_t * block;
-  for (block = (huge_block_t *) shared->large_block; block != NULL; block = block->next_block) {
-    int fd = mmap_fd(block->file_name);
-    fsync(fd);
-    if (!mmap((void *) block, block->huge_block_sz, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0)) {
-      noomr_perror("Unable to reconfigure permissions.");
+  map_missing_blocks();
+  for (block = to_large_alloc(&shared->next_large); block != NULL; block = next_huge(block)) {
+    if (block->my_name != -1) {
+      int fd = mmap_fd(block->my_name);
+      size_t size = block->huge_block_sz;
+      msync((void *) block, block->huge_block_sz, MS_SYNC);
+      munmap((void *) block, block->huge_block_sz);
+      if (!mmap((void *) block, size, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0)) {
+        noomr_perror("Unable to reconfigure permissions.");
+      }
+      close(fd);
     }
-    close(fd);
   }
 }
 
@@ -56,7 +61,7 @@ void synch_lists() {
   }
 
   // Set the stack elements
-  for (page = shared->header_pg; page != NULL; page = (header_page_t *) page->next.next) {
+  for (page = to_header_page(&shared->next_header); page != NULL; page = next_header_pg(page)) {
     for (i = 0; i < MIN(HEADERS_PER_PAGE, page->next_free); i++) {
       if (!seq_alloced(&page->headers[i]) && page->headers[i].seq_next.next != NULL) {
         volatile header_t * next_header = seq_node_to_header((node_t*) page->headers[i].seq_next.next);
@@ -74,7 +79,7 @@ void synch_lists() {
 // (which need to be adjacent to each other) and another for the counter
 void promote_list() {
   size_t i;
-  volatile header_page_t * page, * prev = NULL;
+  volatile header_page_t * page;
   // Set the heads of the stacks to the corresponding elements
   for (i = 0; i < NUM_CLASSES; i++) {
     if(shared->spec_free[i].head != NULL) {
@@ -83,17 +88,12 @@ void promote_list() {
       shared->seq_free[i].head = NULL;
     }
   }
+  volatile size_t loops = 0;
   // Set the stack elements
-  for (page = shared->header_pg; page != NULL; prev = page,  page = (header_page_t *) page->next.next) {
+  map_missing_headers();
+  for (page = to_header_page((noomr_page_t *) shared->next_header.next_page); page != NULL;  page = next_header_pg(page)) {
     // Ensure that PAGE is mapped in
-    if (msync((void *) page, PAGE_SIZE, 0) == -1 && errno == ENOMEM) {
-      // needs to be mapped in
-      int fd = mmap_fd(prev->next.next_file_num);
-      if (fd == -1) {
-        noomr_perror("Unable to create the file.");
-      }
-      mmap((void *) prev->next.next, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_FIXED, fd, 0);
-    }
+    loops++;
     for (i = 0; i < MIN(HEADERS_PER_PAGE, page->next_free); i++) {
       assert(payload(&page->headers[i]) != NULL);
       if (!spec_alloced(&page->headers[i]) && page->headers[i].seq_next.next != NULL) {
@@ -102,6 +102,7 @@ void promote_list() {
       } else {
         page->headers[i].seq_next.next = NULL;
       }
+      page->headers[i].allocator = 0;
     }
   }
 }
