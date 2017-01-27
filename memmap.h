@@ -25,5 +25,6 @@ void* allocate_large(size_t);
 int getuniqueid(void);
 int mmap_fd(unsigned name);
 noomr_page_t * map_missing_pages(void);
+bool is_mapped(void *);
 
 #endif

@@ -80,12 +80,16 @@ static void map_headers(char * begin, size_t index, size_t num_blocks) {
   size_t block_size = CLASS_TO_SIZE(index);
   volatile noomr_stack_t * spec_stack = &shared->spec_free[index];
   volatile noomr_stack_t * seq_stack = &shared->seq_free[index];
+  noomr_stack_t * local_stack = &delayed_frees_reclaimable[index];
   volatile block_t * block;
   assert(block_size == ALIGN(block_size));
 
   for (i = 0; i < num_blocks; i++) {
     while(header_index >= (HEADERS_PER_PAGE - 1) || header_index == -1) {
       for (page = shared->header_pg; page != NULL; page = (volatile header_page_t *) page->next.next) {
+        while (!is_mapped((void *) page)) {
+          map_missing_pages();
+        }
         if (page->next_free < HEADERS_PER_PAGE - 1) {
           header_index = __sync_fetch_and_add(&page->next_free, 1);
           if (header_index < HEADERS_PER_PAGE) {
@@ -111,9 +115,13 @@ static void map_headers(char * begin, size_t index, size_t num_blocks) {
     assert(getblock(getpayload(block))->header == &page->headers[header_index]);
     assert(payload(&page->headers[header_index]) == getpayload(block));
 
-    __sync_synchronize(); // mem fence
-    push(seq_stack, (node_t * ) &page->headers[header_index].seq_next);
-    push(spec_stack, (node_t * ) &page->headers[header_index].spec_next);
+    if (speculating()) {
+      push_ageless(local_stack, (node_t *) &page->headers[header_index].spec_next);
+    } else {
+      __sync_synchronize(); // mem fence
+      push(seq_stack, (node_t * ) &page->headers[header_index].seq_next);
+      push(spec_stack, (node_t * ) &page->headers[header_index].spec_next);
+    }
     // get the i-block
     header_index = -1;
   }

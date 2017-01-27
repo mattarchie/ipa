@@ -2,14 +2,21 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <errno.h>
 #include "noomr.h"
 
-//TODO currently loops tests infinitely when > 2
-#define NUM_ROUNDS 0
+#define NUM_ROUNDS 10
+#define NUM_CHILDREN 2
+#define PER_EACH (NUM_ROUNDS / NUM_CHILDREN)
 
 
 // Random number generation based off of http://www.azillionmonkeys.com/qed/random.html
 #define RS_SCALE (1.0 / (1.0 + RAND_MAX))
+
+
+_Static_assert(NUM_ROUNDS % NUM_CHILDREN == 0, "Rounds must be divisible by children");
 
 volatile bool spec = false;
 
@@ -25,30 +32,40 @@ int getuniqueid() {
   return (int) getpgid(getpid());
 }
 
-int main() {
-  int * sequential = noomr_malloc(sizeof(int));
-  int * ptrs[NUM_ROUNDS + 1] = {NULL};
-  ptrs[0] = sequential;
-  beginspec();
+void __attribute__((noreturn)) child(int id)  {
   spec = true;
-  int rnd, check;
-  size_t alloc_size;
-  srand(0);
-  for (rnd = 1; rnd <= NUM_ROUNDS; rnd++) {
-    alloc_size = MAX_SIZE + sizeof(block_t) + 1;
+  size_t alloc_size = MAX_SIZE + sizeof(block_t) + 1;
+  for (int rnd = PER_EACH * id; rnd < PER_EACH * (id + 1); rnd++) {
     int * payload = noomr_malloc(alloc_size);
     printf("rnd %d Allocated %p\n", rnd, payload);
     assert(noomr_usable_space(payload) >= alloc_size);
-    ptrs[rnd] = payload;
-    for (check = 0; false && check < rnd; check++) {
-      if (ptrs[check] == payload) {
-        fprintf(stderr, "Duplicate allocation found indexes %d %d\n", rnd, check);
-        exit(-1);
-      }
-    }
     *payload = 0xdeadbeef;
   }
+  printf("Child %d exits\n", id);
+  exit(0);
+}
+
+int main() {
+  srand(0);
+  beginspec();
+  for (int i = 0; i < NUM_CHILDREN; i++) {
+    pid_t pid = fork();
+    if (pid == 0) {
+      child(i);
+    } else if (pid == -1) {
+      perror("Unable to fork process");
+      exit(-1);
+    }
+  }
+  int status;
+  while (wait(&status) == 0) {
+    if (errno != ECHILD) {
+      exit(-1);
+    }
+    assert(WIFEXITED(status));
+    assert(WEXITSTATUS(status) == 0);
+  }
   endspec();
-  printf("Large spec allocation test passed! No duplicate allocations detected\n");
+  printf("Large spec allocation test passed!\n");
   print_noomr_stats();
 }

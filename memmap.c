@@ -91,8 +91,9 @@ int mmap_fd(unsigned file_no) {
   return fd;
 }
 
-static inline bool is_mapped(void * ptr) {
-  return !(msync((void *) ptr, 1, MS_ASYNC) == -1 && errno == ENOMEM);
+bool is_mapped(void * ptr) {
+  void * aligned = (void *) (((intptr_t) ptr) & ~(PAGE_SIZE  - 1));
+  return !(msync(aligned, 1, MS_ASYNC) == -1 && errno == ENOMEM);
 }
 
 static inline size_t get_size_fd(int fd) {
@@ -106,22 +107,8 @@ static inline size_t get_size_fd(int fd) {
 // Map all missing pages
 // Returns the last non-null page (eg. the one with the next page filed set to null)
 noomr_page_t * map_missing_pages() {
-  static noomr_page_t * cache = NULL; // cache == NULL ? &shared->next_page : cache
   noomr_page_t * last_page;
-  volatile size_t rounds = 0;
-#define SANITY_SIZE 10000
-  noomr_page_t * sanity[SANITY_SIZE];
-  bzero(&sanity, sizeof(sanity));
-  for (last_page = cache == NULL ? &shared->next_page : cache; last_page->next_page != NULL; last_page = (noomr_page_t *) last_page->next_page) {
-    if (rounds < SANITY_SIZE) {
-      sanity[rounds] = last_page;
-      rounds++;
-      for (int i = 0; false && i < MIN(rounds, SANITY_SIZE); i++) {
-        assert(last_page != sanity[rounds]);
-      }
-    } else {
-      rounds++;
-    }
+  for (last_page = &shared->next_page; last_page->next_page != NULL; last_page = (noomr_page_t *) last_page->next_page) {
     if (!is_mapped((void *) last_page->next_page)) {
       assert(last_page->next_pg_name != -1);
       int fd = mmap_fd(last_page->next_pg_name);
@@ -137,7 +124,7 @@ noomr_page_t * map_missing_pages() {
       }
     }
   }
-  return cache = last_page;
+  return last_page;
 }
 
 /**
@@ -162,6 +149,9 @@ static inline void * allocate_noomr_page(int file_no, size_t minsize, int flags)
 #endif
   if (!speculating()) {
     flags |= MAP_ANONYMOUS;
+  } else {
+    flags &= ~MAP_PRIVATE;
+    flags |= MAP_SHARED;
   }
   file_descriptor = mmap_fd(file_no);
   noomr_page_t * last_page;
