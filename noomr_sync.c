@@ -16,6 +16,7 @@ extern size_t my_growth;
 extern shared_data_t * shared;
 
 void beginspec() {
+  assert(speculating()); // TODO -- probably special case this function
   noomr_init();
   my_growth = 0;
   synch_lists();
@@ -23,6 +24,7 @@ void beginspec() {
 }
 
 void endspec() {
+  assert(speculating()); // TODO -- probably special case this function
   if (my_growth < shared->spec_growth) {
     inc_heap(shared->spec_growth - my_growth);
   }
@@ -46,6 +48,7 @@ static inline void set_large_perm(int flags) {
 void synch_lists() {
   size_t i;
   volatile header_page_t * page;
+  map_missing_pages();
   // Set the heads of the stacks to the corresponding elements
   for (i = 0; i < NUM_CLASSES; i++) {
     if(shared->seq_free[i].head != NULL) {
@@ -75,6 +78,7 @@ void synch_lists() {
 void promote_list() {
   size_t i;
   volatile header_page_t * page, * prev = NULL;
+  map_missing_pages();
   // Set the heads of the stacks to the corresponding elements
   for (i = 0; i < NUM_CLASSES; i++) {
     if(shared->spec_free[i].head != NULL) {
@@ -85,15 +89,6 @@ void promote_list() {
   }
   // Set the stack elements
   for (page = shared->header_pg; page != NULL; prev = page,  page = (header_page_t *) page->next.next) {
-    // Ensure that PAGE is mapped in
-    if (msync((void *) page, PAGE_SIZE, 0) == -1 && errno == ENOMEM) {
-      // needs to be mapped in
-      int fd = mmap_fd(prev->next.next_file_num);
-      if (fd == -1) {
-        noomr_perror("Unable to create the file.");
-      }
-      mmap((void *) prev->next.next, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_FIXED, fd, 0);
-    }
     for (i = 0; i < MIN(HEADERS_PER_PAGE, page->next_free); i++) {
       assert(payload(&page->headers[i]) != NULL);
       if (!spec_alloced(&page->headers[i]) && page->headers[i].seq_next.next != NULL) {

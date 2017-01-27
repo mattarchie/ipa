@@ -104,23 +104,39 @@ static inline size_t get_size_fd(int fd) {
   return st.st_size;
 }
 
+static void map_now (noomr_page_t * last_page) {
+  int fd = mmap_fd(last_page->next_pg_name);
+  if (fd == -1) {
+    // TODO handle error
+  } else {
+    size_t size = get_size_fd(fd);
+    if (mmap((void *) last_page->next_page, size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, fd, 0) == MAP_FAILED) {
+      // TODO handle error
+      abort();
+    }
+    close(fd); // think can do here
+    assert(is_mapped((void *) last_page->next_page));
+  }
+}
+
 // Map all missing pages
 // Returns the last non-null page (eg. the one with the next page filed set to null)
 noomr_page_t * map_missing_pages() {
-  noomr_page_t * last_page;
-  for (last_page = &shared->next_page; last_page->next_page != NULL; last_page = (noomr_page_t *) last_page->next_page) {
-    if (!is_mapped((void *) last_page->next_page)) {
-      assert(last_page->next_pg_name != -1);
-      int fd = mmap_fd(last_page->next_pg_name);
-      if (fd == -1) {
-        // TODO handle error
-      } else {
-        size_t size = get_size_fd(fd);
-        if (mmap((void *) last_page->next_page, size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, fd, 0) == MAP_FAILED) {
-          // TODO handle error
-          abort();
-        }
-        close(fd); // think can do here
+  noomr_page_t * last_page = &shared->next_page;
+  volatile int rounds = 0, maps = 0;
+  if (shared->next_page.next_page != NULL) {
+    if (!is_mapped((void *) &shared->next_page)) {
+      map_now(&shared->next_page);
+      maps++;
+      assert(is_mapped(shared->next_page.next_page));
+    }
+    for (last_page = &shared->next_page;
+         last_page->next_page != NULL;
+         last_page = (noomr_page_t *) last_page->next_page) {
+      rounds++;
+      if (!is_mapped((void *) last_page->next_page)) {
+        map_now(last_page);
+        maps++;
       }
     }
   }

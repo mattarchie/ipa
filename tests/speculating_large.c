@@ -47,6 +47,7 @@ void __attribute__((noreturn)) child(int id)  {
 
 int main() {
   srand(0);
+  spec = true;
   beginspec();
   for (int i = 0; i < NUM_CHILDREN; i++) {
     pid_t pid = fork();
@@ -66,6 +67,7 @@ int main() {
     assert(WEXITSTATUS(status) == 0);
   }
   endspec();
+  spec = false;
   printf("Large spec allocation test passed!\n");
   print_noomr_stats();
 }

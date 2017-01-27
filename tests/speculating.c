@@ -43,8 +43,8 @@ int main() {
   int * sequential = noomr_malloc(sizeof(int));
   int * ptrs[NUM_ROUNDS] = {NULL};
   ptrs[0] = sequential;
-  beginspec();
   spec = true;
+  beginspec();
 
 
   int rnd, check;
@@ -66,6 +66,7 @@ int main() {
     *payload = 42;
   }
   endspec();
+  spec = false;
   printf("Small spec allocation test passed! No duplicate allocations detected\n");
   print_noomr_stats();
 }
