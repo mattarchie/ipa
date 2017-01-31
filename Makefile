@@ -1,12 +1,12 @@
 ifneq ($(TRAVIS_CI), 1)
-	CC = clang
+	CC = gcc
 endif
 
 INCFLAGS = -I./ -I./noomr
-DEFS = -UNOOMR_ALIGN_HEADERS -DCOLLECT_STATS -DNOOMR_SYSTEM_ALLOC -DNO_HOOK
-OPT_FLAGS = -O3 -fno-strict-aliasing -fno-strict-overflow -march=native
+DEFS = -UNOOMR_ALIGN_HEADERS -DCOLLECT_STATS -DNOOMR_SYSTEM_ALLOC -DNO_HOOK -DDEBUG
+OPT_FLAGS = -O0 -fno-strict-aliasing -fno-strict-overflow -march=native
 DEBUG_FLAGS = -ggdb3 -g3
-CFLAGS = $(OPT_FLAGS) $(DEBUG_FLAGS) -fPIC -Wall -Wno-unused-function -Wno-deprecated-declarations -Wno-missing-braces $(INCFLAGS) $(DEFS)
+CFLAGS = $(OPT_FLAGS) $(DEBUG_FLAGS) -fPIC -Wall -Wno-unused-function -Wno-deprecated-declarations $(INCFLAGS) $(DEFS)
 TEST_SOURCE = $(wildcard tests/*.c) $(wildcard tests/parallel/*.c)
 SOURCE = $(wildcard *.c)
 ALL_SOURCE = $(TEST_SOURCE) $(SOURCE)
@@ -15,7 +15,7 @@ TEST_BINARIES = $(basename $(TEST_SOURCE))
 TEST_OBJECTS = $(patsubst %.c,%.o, $(TEST_SOURCE))
 DEP = $(SOURCE:.c=.d) $(TEST_SOURCE:.c=.d)
 
-OBJECTS = noomr.o memmap.o noomr_utils.o noomr_sync.o
+OBJECTS = noomr.o memmap.o noomr_utils.o noomr_sync.o noomr_overrides.o
 LDFLAGS = -Wl,--no-as-needed -ldl -rdynamic -lm
 LIBRARY = libnoomr.a
 

@@ -19,6 +19,7 @@ void beginspec() {
   assert(speculating()); // TODO -- probably special case this function
   noomr_init();
   my_growth = 0;
+  map_missing_pages();
   synch_lists();
   set_large_perm(MAP_PRIVATE);
 }
@@ -28,6 +29,7 @@ void endspec() {
   if (my_growth < shared->spec_growth) {
     inc_heap(shared->spec_growth - my_growth);
   }
+  map_missing_pages();
   promote_list();
   set_large_perm(MAP_PRIVATE);
   free_delayed();
@@ -36,7 +38,7 @@ void endspec() {
 static inline void set_large_perm(int flags) {
   volatile huge_block_t * block;
   for (block = (huge_block_t *) shared->large_block; block != NULL; block = block->next_block) {
-    int fd = mmap_fd(block->file_name);
+    int fd = mmap_existing_fd(block->file_name);
     fsync(fd);
     if (!mmap((void *) block, block->huge_block_sz, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0)) {
       noomr_perror("Unable to reconfigure permissions.");
@@ -48,7 +50,6 @@ static inline void set_large_perm(int flags) {
 void synch_lists() {
   size_t i;
   volatile header_page_t * page;
-  map_missing_pages();
   // Set the heads of the stacks to the corresponding elements
   for (i = 0; i < NUM_CLASSES; i++) {
     if(shared->seq_free[i].head != NULL) {
@@ -59,7 +60,7 @@ void synch_lists() {
   }
 
   // Set the stack elements
-  for (page = shared->header_pg; page != NULL; page = (header_page_t *) page->next.next) {
+  for (page = shared->header_pg; page != NULL; page = (header_page_t *) page->next_header) {
     for (i = 0; i < MIN(HEADERS_PER_PAGE, page->next_free); i++) {
       if (!seq_alloced(&page->headers[i]) && page->headers[i].seq_next.next != NULL) {
         volatile header_t * next_header = seq_node_to_header((node_t*) page->headers[i].seq_next.next);
@@ -88,7 +89,7 @@ void promote_list() {
     }
   }
   // Set the stack elements
-  for (page = shared->header_pg; page != NULL; prev = page,  page = (header_page_t *) page->next.next) {
+  for (page = shared->header_pg; page != NULL; prev = page,  page = (header_page_t *) page->next_header) {
     for (i = 0; i < MIN(HEADERS_PER_PAGE, page->next_free); i++) {
       assert(payload(&page->headers[i]) != NULL);
       if (!spec_alloced(&page->headers[i]) && page->headers[i].seq_next.next != NULL) {

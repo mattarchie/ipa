@@ -47,6 +47,7 @@ void print_noomr_stats() {
   printf("sbrks: %u\n", snapshot.sbrks);
   printf("huge allocations: %u\n", snapshot.huge_allocations);
   printf("header pages: %u\n", snapshot.header_pages);
+  printf("headers / page: %lu\n", HEADERS_PER_PAGE);
   printf("Time spent allocating: %'lu ns (%'.5lf s)\n", snapshot.time_malloc, TIME_TO_SEC(snapshot.time_malloc));
   double average = ((double) snapshot.time_malloc) / snapshot.allocations;
   printf("Average time per allocation: %'.2lf ns\n", average);

@@ -7,6 +7,7 @@
 #include <string.h>
 #include <assert.h>
 #include <error.h>
+
 #include "noomr.h"
 #include "memmap.h"
 #include "stack.h"
@@ -83,10 +84,11 @@ static void map_headers(char * begin, size_t index, size_t num_blocks) {
   noomr_stack_t * local_stack = &delayed_frees_reclaimable[index];
   volatile block_t * block;
   assert(block_size == ALIGN(block_size));
-
+  volatile header_t * header = NULL;
+  const bool am_spec = speculating();
   for (i = 0; i < num_blocks; i++) {
     while(header_index >= (HEADERS_PER_PAGE - 1) || header_index == -1) {
-      for (page = shared->header_pg; page != NULL; page = (volatile header_page_t *) page->next.next) {
+      for (page = shared->header_pg; page != NULL; page = (volatile header_page_t *) page->next_header) {
         while (!is_mapped((void *) page)) {
           map_missing_pages();
         }
@@ -103,24 +105,26 @@ static void map_headers(char * begin, size_t index, size_t num_blocks) {
     }
     found: block = (block_t *) (&begin[i * block_size]);
 
-    page->headers[header_index].size = block_size;
-    // mmaped pages are padded with zeros, set NULL anyways
-    page->headers[header_index].spec_next.next = NULL;
-    page->headers[header_index].seq_next.next = NULL;
-    page->headers[header_index].payload = getpayload(block);
+    header = &page->headers[header_index];
 
-    block->header = (header_t * ) &page->headers[header_index];
+    header->size = block_size;
+    // mmaped pages are padded with zeros, set NULL anyways
+    header->spec_next.next = NULL;
+    header->seq_next.next = NULL;
+    header->payload = getpayload(block);
+
+    block->header = (header_t * ) header;
     // (in)sanity checks
     assert(getblock(getpayload(block)) == block);
-    assert(getblock(getpayload(block))->header == &page->headers[header_index]);
-    assert(payload(&page->headers[header_index]) == getpayload(block));
+    assert(getblock(getpayload(block))->header == header);
+    assert(payload(header) == getpayload(block));
 
-    if (speculating()) {
-      push_ageless(local_stack, (node_t *) &page->headers[header_index].spec_next);
+    if (am_spec) {
+      push_ageless(local_stack, (node_t *) &header->spec_next);
     } else {
       __sync_synchronize(); // mem fence
-      push(seq_stack, (node_t * ) &page->headers[header_index].seq_next);
-      push(spec_stack, (node_t * ) &page->headers[header_index].spec_next);
+      push(seq_stack, (node_t * ) &header->seq_next);
+      push(spec_stack, (node_t * ) &header->spec_next);
     }
     // get the i-block
     header_index = -1;
@@ -136,6 +140,8 @@ void noomr_init() {
 #ifdef COLLECT_STATS
     shared->total_alloc = PAGE_SIZE;
 #endif
+    shared->next_page.next_pg_name = 0;
+    shared->next_page.next_page = NULL;
   }
 }
 
@@ -193,13 +199,14 @@ void * noomr_malloc(size_t size) {
   if (size == 0) {
     return NULL;
   } else if (size > MAX_SIZE) {
-    void * block = allocate_large(aligned);
+    huge_block_t * block = allocate_large(aligned);
     if (block != NULL) {
-      record_allocation(block, noomr_usable_space(block));
+      record_allocation(block, block->huge_block_sz);
     } else {
       noomr_perror("Unable to allocate large user payload");
+      return NULL;
     }
-    return block;
+    return gethugepayload(block);
   } else {
     alloc:
     header = alloc_pop(aligned);
@@ -236,6 +243,7 @@ void * noomr_malloc(size_t size) {
 }
 
 void noomr_free(void * payload) {
+  return; // TODO remove
 #ifdef COLLECT_STATS
   __sync_add_and_fetch(&shared->frees, 1);
 #endif
@@ -248,15 +256,17 @@ void noomr_free(void * payload) {
   if (out_of_range(payload)) {
     // A huge block is unmapped directly to kernel
     // This can be done immediately -- there is no re-allocation conflicts
-    huge_block_t * block = gethugeblock(payload);
-    if (munmap(block, block->huge_block_sz) == -1) {
-      noomr_perror("Unable to unmap block");
+    if (!speculating()) {
+      huge_block_t * block = gethugeblock(payload);
+      if (munmap(block, block->huge_block_sz) == -1) {
+        noomr_perror("Unable to unmap block");
+      }
     }
   } else if (!speculating()) {
     // Not speculating -- free now
     volatile noomr_stack_t * stack = &shared->seq_free[SIZE_TO_CLASS(header->size)];
     record_mode_free(header);
-    push(stack, speculating() ? &header->spec_next : &header->seq_next);
+    push(stack, &header->seq_next);
   } else if (header->allocator == getpid()) {
     // This is reclaimable
     size_t index = SIZE_TO_CLASS(noomr_usable_space(payload));
@@ -279,12 +289,12 @@ void free_delayed() {
     while (!empty(&delayed_frees_unclaimable[index])) {
       volatile node_t * node = pop_ageless(&delayed_frees_unclaimable[index]);
       volatile header_t * head = container_of(node, volatile header_t, spec_next);
-      push(&shared->spec_free[index], &head->spec_next);
+      push_ageless((noomr_stack_t *) &shared->seq_free[index], (node_t *)  &head->spec_next);
     }
     while (!empty(&delayed_frees_reclaimable[index])) {
       volatile node_t * node = pop_ageless(&delayed_frees_reclaimable[index]);
       volatile header_t * head = container_of(node, volatile header_t, spec_next);
-      push(&shared->spec_free[index], &head->spec_next);
+      push_ageless((noomr_stack_t *) &shared->seq_free[index], (node_t *) &head->spec_next);
     }
   }
 }
@@ -318,63 +328,3 @@ void noomr_teardown() {
     perror("Unable to destroy tmp directory!");
   }
 }
-
-#ifdef NOOMR_SYSTEM_ALLOC
-#if defined(__GNUC__) && !defined(NO_HOOK)
-#include <malloc.h>
-
-static void * noomr_malloc_hook (size_t size, const void * c){
-  return noomr_malloc(size);
-}
-
-static void noomr_free_hook (void* payload, const void * c){
-  noomr_free(payload);
-}
-
-static void * noomr_realloc_hook(void * payload, size_t size, const void * c) {
-  return noomr_realloc(payload, size);
-}
-
-static void * noomr_calloc_hook(size_t a, size_t b, const void * c) {
-  return noomr_calloc(a, b);
-}
-
-static void noomr_dehook() {
-  __malloc_hook = NULL;
-  __free_hook = NULL;
-  __realloc_hook = NULL;
-#ifdef __calloc_hook
-  __calloc_hook = NULL;
-#endif
-
-}
-
-void __attribute__((constructor)) noomr_hook() {
-  atexit(noomr_dehook);
-  __malloc_hook = noomr_malloc_hook;
-  __free_hook = noomr_free_hook;
-  __realloc_hook = noomr_realloc_hook;
-#ifdef __calloc_hook
-  __calloc_hook = noomr_calloc_hook;
-#endif
-}
-
-#else
-
-void * malloc(size_t t) {
-  return noomr_malloc(t);
-}
-void free(void * p) {
-  noomr_free(p);
-}
-size_t malloc_usable_size(void * p) {
-  return noomr_usable_space(p);
-}
-void * realloc(void * p, size_t size) {
-  return noomr_realloc(p, size);
-}
-void * calloc(size_t a, size_t b) {
-  return noomr_calloc(a, b);
-}
-#endif
-#endif

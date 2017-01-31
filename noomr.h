@@ -5,7 +5,6 @@
 #include <math.h>
 #include <assert.h>
 #include "stack.h"
-#include "memmap.h"
 
 #if __WORDSIZE == 64
 #define ALIGNMENT (8) // I think?
@@ -58,6 +57,24 @@ static inline const size_t class_for_size(unsigned x) {
   abort();
 }
 
+
+#if __SIZEOF_POINTER__ == 8
+// 64b pointers
+#define combined_page_t unsigned __int128
+#else
+#define combined_page_t uint64_t
+#endif
+
+typedef struct {
+  union {
+    struct {
+      volatile struct noomr_page_t * next_page;
+      volatile int next_pg_name;
+    };
+    combined_page_t combined;
+  };
+} noomr_page_t;
+
 typedef union {
 #ifdef NOOMR_ALIGN_HEADERS
   //for header alignment to cache line bounds
@@ -91,28 +108,19 @@ typedef union {
 #define combinded_header_next_t uint64_t
 #endif
 
-#define HEADERS_PER_PAGE ((PAGE_SIZE - \
-                          (sizeof(header_page_next_t) + sizeof(size_t) + sizeof(noomr_page_t)))  \
-                          / sizeof(header_t))
-typedef struct {
-  union {
-    struct {
-      volatile struct header_page_t * next;
-      int next_file_num; // NOT THE FILE DESCRIPTOR
-    };
-    combinded_header_next_t combined;
-  };
-} header_page_next_t;
+#define HEADERS_PER_PAGE ((( PAGE_SIZE) - \
+                          (sizeof(size_t) + sizeof(noomr_page_t))) / sizeof(header_t) \
+                          )
 
 typedef struct {
   noomr_page_t next_page;
-  header_page_next_t next;
+  volatile struct header_page_t * next_header;
   // unsigned number; // to be used used to help minimize the number of header pages?
   size_t next_free;
   header_t headers[HEADERS_PER_PAGE];
 } header_page_t;
 
-_Static_assert(sizeof(header_page_t) <= PAGE_SIZE, "Header pages not configured correctly");
+// _Static_assert(sizeof(header_page_t) <= PAGE_SIZE, "Header pages not configured correctly");
 
 typedef struct {
   header_t * header;
@@ -120,10 +128,13 @@ typedef struct {
 
 typedef struct {
   noomr_page_t next_page;
+  volatile struct huge_block_t * next_block;
   size_t huge_block_sz; //Note: this includes the block_t space
-  volatile void * next_block; // Might be able to eliminate this
   int file_name; // Might be able to eliminate this field
 } huge_block_t;
+
+_Static_assert(__builtin_offsetof(huge_block_t, next_page) == 0, "Bad struct: huge_block_t");
+_Static_assert(__builtin_offsetof(header_page_t, next_page) == 0, "Bad struct: header_page_t");
 
 
 // Used to collect statics with minimal cache impact
@@ -140,7 +151,7 @@ typedef struct {
   volatile line_int_t huge_allocations;
   volatile line_int_t header_pages;
   volatile size_t total_alloc; // total space allocated from the system (heap + mmap)
-  volatile unsigned long time_malloc;
+  volatile uint64_t time_malloc;
 #endif
   volatile noomr_stack_t seq_free[NUM_CLASSES]; // sequential free list
   volatile noomr_stack_t spec_free[NUM_CLASSES]; // speculative free list

@@ -93,7 +93,7 @@ static inline void push_ageless(noomr_stack_t * stack, node_t * node) {
 }
 
 static inline volatile node_t * pop_ageless(volatile noomr_stack_t * stack) {
-  if (stack->head == NULL) {
+  if (empty(stack)) {
     return NULL;
   } else {
     volatile node_t * pop = stack->head;
