@@ -289,12 +289,12 @@ void free_delayed() {
     while (!empty(&delayed_frees_unclaimable[index])) {
       volatile node_t * node = pop_ageless(&delayed_frees_unclaimable[index]);
       volatile header_t * head = container_of(node, volatile header_t, spec_next);
-      push_ageless((noomr_stack_t *) &shared->seq_free[index], (node_t *)  &head->spec_next);
+      push_ageless((noomr_stack_t *) &shared->seq_free[index], (node_t *)  &head->seq_next);
     }
     while (!empty(&delayed_frees_reclaimable[index])) {
       volatile node_t * node = pop_ageless(&delayed_frees_reclaimable[index]);
       volatile header_t * head = container_of(node, volatile header_t, spec_next);
-      push_ageless((noomr_stack_t *) &shared->seq_free[index], (node_t *) &head->spec_next);
+      push_ageless((noomr_stack_t *) &shared->seq_free[index], (node_t *) &head->seq_next);
     }
   }
 }

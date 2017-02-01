@@ -30,9 +30,9 @@ void endspec() {
     inc_heap(shared->spec_growth - my_growth);
   }
   map_missing_pages();
+  free_delayed(); 
   promote_list();
   // set_large_perm(MAP_PRIVATE);
-  free_delayed();
 }
 
 static inline void set_large_perm(int flags) {
@@ -78,7 +78,7 @@ void synch_lists() {
 // (which need to be adjacent to each other) and another for the counter
 void promote_list() {
   size_t i;
-  volatile header_page_t * page, * prev = NULL;
+  volatile header_page_t * page;
   map_missing_pages();
   // Set the heads of the stacks to the corresponding elements
   for (i = 0; i < NUM_CLASSES; i++) {
@@ -89,7 +89,7 @@ void promote_list() {
     }
   }
   // Set the stack elements
-  for (page = shared->header_pg; page != NULL; prev = page,  page = (header_page_t *) page->next_header) {
+  for (page = shared->header_pg; page != NULL; page = (header_page_t *) page->next_header) {
     for (i = 0; i < MIN(HEADERS_PER_PAGE, page->next_free); i++) {
       assert(payload(&page->headers[i]) != NULL);
       if (!spec_alloced(&page->headers[i]) && page->headers[i].seq_next.next != NULL) {
