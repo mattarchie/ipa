@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <math.h>
 #include <assert.h>
+
 #include "stack.h"
 
 #if __WORDSIZE == 64
@@ -131,6 +132,7 @@ typedef struct {
   volatile struct huge_block_t * next_block;
   size_t huge_block_sz; //Note: this includes the block_t space
   int file_name; // Might be able to eliminate this field
+  bool is_shared;
 } huge_block_t;
 
 _Static_assert(__builtin_offsetof(huge_block_t, next_page) == 0, "Bad struct: huge_block_t");

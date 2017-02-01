@@ -53,6 +53,7 @@ static int rmkdir(char *dir) {
   return mkdir_ne(tmp, S_IRWXU);
 }
 
+static size_t get_size_fd(int);
 
 /**
  * Open a file descriptor NAMED file_no for later use by mmap
@@ -88,41 +89,46 @@ int mmap_fd_bool(unsigned file_no, size_t size, bool no_fd) {
     noomr_perror("Unable to create the file.");
     abort();
   }
-
-  // need to truncate (grow -- poor naming) the file
-  if (ftruncate(fd, size) < 0) {
-    noomr_perror("NOOMR_MMAP: Unable to truncate/grow file");
-    abort();
+  if (get_size_fd(fd) < size) {
+    // need to truncate (grow -- poor naming) the file
+    if (ftruncate(fd, size) < 0) {
+      noomr_perror("NOOMR_MMAP: Unable to truncate/grow file");
+      abort();
+    }
   }
   return fd;
 }
 
 int mmap_fd(unsigned name, size_t size) {
-  return mmap_fd_bool(name, size, !speculating());
+  return mmap_fd_bool(name, size, false);
 }
 
 #define _GNU_SOURCE
 #include <signal.h>
 
 static noomr_page_t * map_info;
+static bool is_mapped_bool;
 
-static void map_now(noomr_page_t *);
+static void map_now(volatile noomr_page_t *);
 
-void map_handler(int _) {
+void map_handler(int __attribute__((unused__)) x) {
+  is_mapped_bool = false;
   map_now(map_info);
 }
 
-bool mapped_handler(noomr_page_t * prev) {
+bool is_mapped_segv_check(volatile noomr_page_t * prev)  {
   map_info = prev;
+  is_mapped_bool = true;
   typeof(&map_handler) old = signal(SIGSEGV, map_handler);
   if (old == SIG_ERR) {
     noomr_perror("Unable to install signal handler");
     abort();
   }
   __sync_synchronize();
-  volatile noomr_page_t data = *prev;
+  volatile noomr_page_t __attribute__((__unused__)) data = *(noomr_page_t *) prev->next_page;
   __sync_synchronize();
   signal(SIGSEGV, old);
+  return is_mapped_bool;
 }
 
 bool is_mapped(void * ptr) {
@@ -151,6 +157,7 @@ static inline size_t get_size_name(unsigned name) {
   int fd = open(path, O_RDONLY);
   if (fd == -1) {
     noomr_perror("Unable to open existing file");
+    abort();
   }
   size_t size = get_size_fd(fd);
   if (close(fd)) {
@@ -163,7 +170,10 @@ int mmap_existing_fd(unsigned name) {
   return mmap_fd_bool(name, get_size_name(name), false);
 }
 
-static void map_now (noomr_page_t * last_page) {
+static void map_now (volatile noomr_page_t * last_page) {
+  if (last_page->next_pg_name == (unsigned) -1) {
+    abort();
+  }
   int fd = mmap_existing_fd(last_page->next_pg_name);
   if (fd == -1) {
     // TODO handle error
@@ -181,24 +191,31 @@ static void map_now (noomr_page_t * last_page) {
     }
   }
 }
+static inline bool full_map_check(volatile noomr_page_t * prev) {
+  if (is_mapped(prev->next_page)) {
+    return true;
+  } else {
+    return is_mapped_segv_check(prev);
+  }
+}
 
 // Map all missing pages
 // Returns the last non-null page (eg. the one with the next page filed set to null)
 noomr_page_t * map_missing_pages() {
-  static noomr_page_t * cache = -1;
-  noomr_page_t * start = cache == -1 ? &shared->next_page : cache;
-  noomr_page_t * last_page = start;
+  static volatile noomr_page_t * cache = NULL;
+  volatile noomr_page_t * start = cache == NULL ? &shared->next_page : cache;
+  volatile noomr_page_t * last_page = start, * prev = NULL;
   // These are for debugging, volatile so they can't be removed by compiler
   volatile int rounds = 0, maps = 0;
   if (start->next_page != NULL) {
-    if (!is_mapped((void *) &start->next_page)) {
+    if (!full_map_check(start)) {
       maps++;
       map_now(start);
       assert(is_mapped((void *)  start->next_page));
     }
-    for (last_page = start; last_page->next_page != NULL; last_page = (noomr_page_t *) last_page->next_page) {
+    for (last_page = start; last_page->next_page != NULL; prev = last_page,  last_page = (volatile noomr_page_t *) last_page->next_page) {
       rounds++;
-      if (!is_mapped((void *) last_page->next_page) && !mapped_handler(last_page)) {
+      if (!full_map_check(last_page)) {
         maps++;
         map_now(last_page);
       }
@@ -210,7 +227,7 @@ noomr_page_t * map_missing_pages() {
       }
     }
   }
-  return cache = last_page;
+  return last_page;
 }
 
 /**
@@ -230,7 +247,7 @@ static inline noomr_page_t * allocate_noomr_page(int file_no, size_t minsize, in
   size_t allocation_size = MAX(minsize, PAGE_SIZE);
   assert(allocation_size % PAGE_SIZE == 0);
   assert(shared != NULL);
-  if (!speculating()) {
+  if (false && !speculating()) {
     flags |= MAP_ANONYMOUS;
   } else {
     flags &= ~MAP_PRIVATE;
@@ -248,7 +265,7 @@ static inline noomr_page_t * allocate_noomr_page(int file_no, size_t minsize, in
     allocation = mmap(NULL, allocation_size, PROT_READ | PROT_WRITE, flags, file_descriptor, 0);
     if (allocation == MAP_FAILED) {
       noomr_perror("Unable to set up mmap page");
-      continue;
+      abort();
     }
 #ifdef MANUAL_ZERO
     memset(allocation, 0, allocation_size);
@@ -283,7 +300,7 @@ static inline noomr_page_t * allocate_noomr_page(int file_no, size_t minsize, in
 }
 
 void allocate_header_page() {
-  const int file_no = !speculating() ? -1 : __sync_add_and_fetch(&shared->next_name, 1);
+  const int file_no = __sync_add_and_fetch(&shared->next_name, 1);
   header_page_t * headers = (header_page_t *) allocate_noomr_page(file_no, MAX(PAGE_SIZE, sizeof(header_page_t)), MAP_SHARED);
   _Static_assert(__builtin_offsetof(header_page_t, next_page) == 0, "Offset must be 0");
   if (headers == (header_page_t *) -1) {
@@ -309,7 +326,7 @@ void allocate_header_page() {
 }
 
 huge_block_t * allocate_large(size_t size) {
-  int file_no = !speculating() ? -1 : __sync_add_and_fetch(&shared->next_name, 1);
+  int file_no =  __sync_add_and_fetch(&shared->next_name, 1);
   // Align to a page size
   size_t alloc_size = PAGE_ALIGN((size + sizeof(huge_block_t)));
   assert(alloc_size > size);
@@ -320,6 +337,7 @@ huge_block_t * allocate_large(size_t size) {
   }
   block->huge_block_sz = alloc_size;
   block->file_name = file_no;
+  block->is_shared = speculating();
   do {
     block->next_block = (volatile struct block_t *) shared->large_block;
   } while(!__sync_bool_compare_and_swap(&shared->large_block, block->next_block, block));

@@ -61,6 +61,7 @@ int main() {
   int status;
   while (wait(&status) == 0) {
     if (errno != ECHILD) {
+      noomr_perror("Unexpected error");
       exit(-1);
     }
     assert(WIFEXITED(status));

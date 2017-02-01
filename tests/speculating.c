@@ -63,7 +63,7 @@ int main() {
         exit(-1);
       }
     }
-    *payload = 42;
+    *payload = 0xdeadbeef;
   }
   endspec();
   spec = false;

@@ -21,7 +21,7 @@ void beginspec() {
   my_growth = 0;
   map_missing_pages();
   synch_lists();
-  set_large_perm(MAP_PRIVATE);
+  // set_large_perm(MAP_PRIVATE);
 }
 
 void endspec() {
@@ -30,20 +30,25 @@ void endspec() {
     inc_heap(shared->spec_growth - my_growth);
   }
   map_missing_pages();
-  free_delayed(); 
+  free_delayed();
   promote_list();
   // set_large_perm(MAP_PRIVATE);
 }
 
 static inline void set_large_perm(int flags) {
   volatile huge_block_t * block;
-  for (block = (huge_block_t *) shared->large_block; block != NULL; block = block->next_block) {
-    int fd = mmap_existing_fd(block->file_name);
-    fsync(fd);
-    if (!mmap((void *) block, block->huge_block_sz, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0)) {
-      noomr_perror("Unable to reconfigure permissions.");
+  huge_block_t data = {0};
+  for (block = (volatile huge_block_t *) shared->large_block; block != NULL; block = (volatile huge_block_t *)  block->next_block) {
+    if (block->is_shared) {
+      int fd = mmap_existing_fd(block->file_name);
+      data = *block;
+      fsync(fd);
+      if (!mmap((void *) block, data.huge_block_sz, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0)) {
+        noomr_perror("Unable to reconfigure permissions.");
+      }
+      close(fd);
+      block->is_shared = false;
     }
-    close(fd);
   }
 }
 
