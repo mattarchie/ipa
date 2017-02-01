@@ -53,13 +53,14 @@ static int rmkdir(char *dir) {
   return mkdir_ne(tmp, S_IRWXU);
 }
 
+
 /**
  * Open a file descriptor NAMED file_no for later use by mmap
  * @param  file_no [description]
  * @return         [description]
  */
-int mmap_fd(unsigned file_no, size_t size) {
-  if (!speculating()) {
+int mmap_fd_bool(unsigned file_no, size_t size, bool no_fd) {
+  if (no_fd) {
     return -1;
   }
   char path[2048]; // 2 kB of path -- more than enough
@@ -96,10 +97,38 @@ int mmap_fd(unsigned file_no, size_t size) {
   return fd;
 }
 
+int mmap_fd(unsigned name, size_t size) {
+  return mmap_fd_bool(name, size, !speculating());
+}
+
+#define _GNU_SOURCE
+#include <signal.h>
+
+static noomr_page_t * map_info;
+
+static void map_now(noomr_page_t *);
+
+void map_handler(int _) {
+  map_now(map_info);
+}
+
+bool mapped_handler(noomr_page_t * prev) {
+  map_info = prev;
+  typeof(&map_handler) old = signal(SIGSEGV, map_handler);
+  if (old == SIG_ERR) {
+    noomr_perror("Unable to install signal handler");
+    abort();
+  }
+  __sync_synchronize();
+  volatile noomr_page_t data = *prev;
+  __sync_synchronize();
+  signal(SIGSEGV, old);
+}
+
 bool is_mapped(void * ptr) {
-  void * aligned = (void *) (((intptr_t) ptr) & ~(PAGE_SIZE  - 1));
-  bool b = !(msync(aligned, 1, MS_ASYNC) == -1 && errno == ENOMEM);
-  errno = 0;
+  noomr_page_t * aligned = (noomr_page_t *) (((intptr_t) ptr) & ~(PAGE_SIZE  - 1));
+  bool b = !(msync((void *) aligned, 1, MS_ASYNC) == -1 && errno == ENOMEM);
+  // errno = 0;
   return b;
 }
 
@@ -114,24 +143,12 @@ static inline size_t get_size_fd(int fd) {
 static inline size_t get_size_name(unsigned name) {
   char path[2048]; // 2 kB of path -- more than enough
   int written;
-  // ensure the directory is present
-  written = snprintf(&path[0], sizeof(path), "%s%d/", "/tmp/bop/", getuniqueid());
-  if (written > sizeof(path) || written < 0) {
-    noomr_perror("Unable to write directory name");
-    abort();
-  }
-
-  if (rmkdir(&path[0]) != 0 && errno != EEXIST) {
-    noomr_perror("Unable to make the directory");
-    abort();
-  }
-  // now create the file
   written = snprintf(&path[0], sizeof(path), "%s%d/%u", "/tmp/bop/", getuniqueid(), name);
   if (written > sizeof(path) || written < 0) {
     noomr_perror("Unable to write the output path");
     abort();
   }
-  int fd = open(path, O_RDWR | O_SYNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+  int fd = open(path, O_RDONLY);
   if (fd == -1) {
     noomr_perror("Unable to open existing file");
   }
@@ -143,7 +160,7 @@ static inline size_t get_size_name(unsigned name) {
 }
 
 int mmap_existing_fd(unsigned name) {
-  return mmap_fd(name, get_size_name(name));
+  return mmap_fd_bool(name, get_size_name(name), false);
 }
 
 static void map_now (noomr_page_t * last_page) {
@@ -181,7 +198,7 @@ noomr_page_t * map_missing_pages() {
     }
     for (last_page = start; last_page->next_page != NULL; last_page = (noomr_page_t *) last_page->next_page) {
       rounds++;
-      if (!is_mapped((void *) last_page->next_page)) {
+      if (!is_mapped((void *) last_page->next_page) && !mapped_handler(last_page)) {
         maps++;
         map_now(last_page);
       }

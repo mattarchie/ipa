@@ -31,7 +31,7 @@ void endspec() {
   }
   map_missing_pages();
   promote_list();
-  set_large_perm(MAP_PRIVATE);
+  // set_large_perm(MAP_PRIVATE);
   free_delayed();
 }
 
