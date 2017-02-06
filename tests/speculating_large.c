@@ -35,6 +35,9 @@ int getuniqueid() {
 void __attribute__((noreturn)) child(int id)  {
   spec = true;
   size_t alloc_size = MAX_SIZE + sizeof(block_t) + 1;
+  while (shared->dummy == 0) {
+    ;
+  }
   for (int rnd = PER_EACH * id; rnd < PER_EACH * (id + 1); rnd++) {
     int * payload = noomr_malloc(alloc_size);
     printf("rnd %d Allocated %p\n", rnd, payload);
@@ -58,6 +61,7 @@ int main() {
       exit(-1);
     }
   }
+  shared->dummy = 1;
   int status;
   while (wait(&status) == 0) {
     if (errno != ECHILD) {

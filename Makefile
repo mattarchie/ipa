@@ -1,10 +1,10 @@
 ifneq ($(TRAVIS_CI), 1)
-	CC = gcc
+	CC = clang
 endif
 
 INCFLAGS = -I./ -I./noomr
 DEFS = -UNOOMR_ALIGN_HEADERS -DCOLLECT_STATS -DNOOMR_SYSTEM_ALLOC -DNO_HOOK -DDEBUG
-OPT_FLAGS = -O0 -fno-strict-aliasing -fno-strict-overflow -march=native
+OPT_FLAGS = -O3 -fno-strict-aliasing -fno-strict-overflow -march=native
 DEBUG_FLAGS = -ggdb3 -g3
 CFLAGS = $(OPT_FLAGS) $(DEBUG_FLAGS) -fPIC -Wall -Wno-unused-function -Wno-deprecated-declarations $(INCFLAGS) $(DEFS)
 TEST_SOURCE = $(wildcard tests/*.c) $(wildcard tests/parallel/*.c)
@@ -52,9 +52,10 @@ tests/%: tests/%.o $(OBJECTS)
 tests: $(TEST_OBJECTS) $(TEST_BINARIES)
 # NOTE: Tests objects is listed as a dependency so make will not auto-remove them
 
+
 test: $(TEST_BINARIES)
-	@echo Test binaries: $(sort $(notdir $(TEST_BINARIES)))
-	ruby tests/test_runner.rb $(sort $(TEST_BINARIES))
+	@echo Test binaries: $(sort $(filter-out speculating_large, $(notdir $(TEST_BINARIES))))
+	@ruby tests/test_runner.rb $(filter-out tests/speculating_large, $(sort $(TEST_BINARIES)))
 
 clean:
 	rm -f $(TEST_OBJECTS) $(TEST_BINARIES) $(OBJECTS) gmon.out $(LIBRARY)

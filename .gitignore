@@ -33,3 +33,7 @@
 *.su
 core
 *.d
+
+libnoomr.a
+cscope.out
+*.d
