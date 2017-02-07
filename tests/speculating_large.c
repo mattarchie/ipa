@@ -6,6 +6,7 @@
 #include <sys/wait.h>
 #include <errno.h>
 #include "noomr.h"
+#include "noomr_utils.h"
 
 #define NUM_ROUNDS 10
 #define NUM_CHILDREN 2

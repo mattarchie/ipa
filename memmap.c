@@ -106,12 +106,12 @@ int mmap_fd(unsigned name, size_t size) {
 #define _GNU_SOURCE
 #include <signal.h>
 
-static noomr_page_t * map_info;
+static volatile noomr_page_t * map_info;
 static bool is_mapped_bool;
 
 static void map_now(volatile noomr_page_t *);
 
-void map_handler(int __attribute__((unused__)) x) {
+void map_handler(int x) {
   is_mapped_bool = false;
   map_now(map_info);
 }
@@ -192,7 +192,7 @@ static void map_now (volatile noomr_page_t * last_page) {
   }
 }
 static inline bool full_map_check(volatile noomr_page_t * prev) {
-  if (is_mapped(prev->next_page)) {
+  if (is_mapped((void *) prev->next_page)) {
     return true;
   } else {
     return is_mapped_segv_check(prev);
@@ -201,10 +201,11 @@ static inline bool full_map_check(volatile noomr_page_t * prev) {
 
 // Map all missing pages
 // Returns the last non-null page (eg. the one with the next page filed set to null)
-noomr_page_t * map_missing_pages() {
+volatile noomr_page_t * map_missing_pages() {
   static volatile noomr_page_t * cache = NULL;
   volatile noomr_page_t * start = cache == NULL ? &shared->next_page : cache;
-  volatile noomr_page_t * last_page = start, * prev = NULL;
+  volatile noomr_page_t * last_page = start;
+  volatile noomr_page_t * prev __attribute__((unused)) = NULL;
   // These are for debugging, volatile so they can't be removed by compiler
   volatile int rounds = 0, maps = 0;
   if (start->next_page != NULL) {
@@ -254,7 +255,7 @@ static inline noomr_page_t * allocate_noomr_page(int file_no, size_t minsize, in
     flags |= MAP_SHARED;
   }
   file_descriptor = mmap_fd(file_no, allocation_size);
-  noomr_page_t * last_page;
+  volatile noomr_page_t * last_page;
   while (true) {
     last_page = map_missing_pages();
     /**
@@ -293,9 +294,9 @@ static inline noomr_page_t * allocate_noomr_page(int file_no, size_t minsize, in
       noomr_perror("Unable to close file descriptor");
     }
   }
-  assert(last_page->next_page == allocation);
-  assert(allocation->next_page != last_page);
-  assert(allocation->next_page != allocation);
+  assert( (noomr_page_t *) last_page->next_page == allocation);
+  assert( (noomr_page_t *) allocation->next_page != last_page);
+  assert( (noomr_page_t *) allocation->next_page != allocation);
   return allocation;
 }
 
@@ -317,7 +318,7 @@ void allocate_header_page() {
       headers->next_header = (volatile struct header_page_t *) shared->header_pg;
     } while (!__sync_bool_compare_and_swap(&shared->header_pg, headers->next_header, (struct header_page_t *) headers));
   }
-  if (headers == headers->next_page.next_page) {
+  if (headers == (header_page_t *) headers->next_page.next_page) {
     abort();
   }
 #ifdef COLLECT_STATS
@@ -339,7 +340,7 @@ huge_block_t * allocate_large(size_t size) {
   block->file_name = file_no;
   block->is_shared = speculating();
   do {
-    block->next_block = (volatile struct block_t *) shared->large_block;
+    block->next_block = (volatile struct huge_block_t *) shared->large_block;
   } while(!__sync_bool_compare_and_swap(&shared->large_block, block->next_block, block));
   if (block == (huge_block_t *) block->next_page.next_page) {
     abort();
