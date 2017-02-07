@@ -1,12 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "noomr.h"
-
-extern void * noomr_malloc(size_t);
-
-bool speculating() {
-  return false;
-}
+#include "dummy.h"
 
 int main() {
   int * payload = calloc(sizeof(int), 1);

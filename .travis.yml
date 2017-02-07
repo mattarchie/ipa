@@ -1,18 +1,30 @@
+dist: trusty
+sudo: required
+
 language: c
-sudo: false
+
+cache:
+  apt: true
+
 compiler:
-  - gcc
-  - clang
-os:
-  - linux
-matrix:
-  fast_finish: true
+  - gcc-5
+  - gcc-6
+  - clang-3.8
+
+git:
+  submodules: false
 
 addons:
   apt:
+    sources:
+    # add PPAs with more up-to-date toolchains
+    - ubuntu-toolchain-r-test
+    - llvm-toolchain-precise-3.6
     packages:
-    - gcc
-    - clang
+    # install toolchains
+    - gcc-5
+    - gcc-6
+    - clang-3.8
 
 script:
   - make && make test
