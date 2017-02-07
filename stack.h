@@ -23,7 +23,11 @@ typedef union {
     volatile stack_age_t age;
   };
   combined_stack_t combined;
-} noomr_stack_t;
+}
+#ifdef NOOMR_ALIGN_STACKS
+__attribute__((aligned (64)))
+#endif
+noomr_stack_t;
 
 
 static inline bool empty(volatile noomr_stack_t * stack) {

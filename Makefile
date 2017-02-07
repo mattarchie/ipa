@@ -1,9 +1,9 @@
 ifneq ($(TRAVIS_CI), 1)
-	CC = clang
+	CC = gcc
 endif
 
 INCFLAGS = -I./ -I./noomr
-DEFS = -UNOOMR_ALIGN_HEADERS -DCOLLECT_STATS -DNOOMR_SYSTEM_ALLOC -DNO_HOOK -DDEBUG
+DEFS = -DCOLLECT_STATS -DNOOMR_SYSTEM_ALLOC -DNO_HOOK -DDEBUG -DNOOMR_ALIGN_STACKS
 OPT_FLAGS = -O3 -fno-strict-aliasing -fno-strict-overflow -march=native
 DEBUG_FLAGS = -ggdb3 -g3
 CFLAGS = $(OPT_FLAGS) $(DEBUG_FLAGS) -fPIC -Wall -Wno-unused-function -Wno-deprecated-declarations $(INCFLAGS) $(DEFS)
