@@ -3,7 +3,7 @@ ifneq ($(TRAVIS_CI), 1)
 endif
 
 INCFLAGS = -I./ -I./noomr
-DEFS = -DCOLLECT_STATS -DNOOMR_SYSTEM_ALLOC -DNO_HOOK -DDEBUG -DNOOMR_ALIGN_STACKS
+DEFS = -DCOLLECT_STATS -DNOOMR_SYSTEM_ALLOC -DNO_HOOK -DDEBUG
 OPT_FLAGS = -O3 -fno-strict-aliasing -fno-strict-overflow -march=native
 DEBUG_FLAGS = -ggdb3 -g3
 CFLAGS = $(OPT_FLAGS) $(DEBUG_FLAGS) -fPIC -Wall -Wno-unused-function -Wno-deprecated-declarations $(INCFLAGS) $(DEFS)
