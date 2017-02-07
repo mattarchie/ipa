@@ -4,7 +4,7 @@ _No Out Of Memory allocatoR_
 
 (c) Benjamin O'Halloran
 
-[![Build Status](https://travis-ci.org/benohalloran/noomr.svg)](https://travis-ci.org/benohalloran/noomr)
+[![Build Status](https://travis-ci.org/benohalloran/noomr.svg?branch=master)](https://travis-ci.org/benohalloran/noomr)
 
 # About
 
