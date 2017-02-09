@@ -6,22 +6,22 @@
 #include <error.h>
 #include <unistd.h>
 #include <errno.h>
-#include "noomr.h"
+#include "bomalloc.h"
 #include "timing.h" // Used for the time to seconds macro
 
 // Require placing data in user-supplied buffer
 
-void noomr_strerr(char * buffer, size_t len) {
+void bomalloc_strerr(char * buffer, size_t len) {
   // For now, no error handling
   assert(strerror_r(errno, buffer, len) == 0);
 }
 
 // Get the
-void noomr_perror(const char * msg) {
+void bomalloc_perror(const char * msg) {
   char error_buffer[512]; // holds strerror
   char master_buffer[2048]; // final thing to write out
   // Get the error string
-  noomr_strerr(&error_buffer[0], sizeof(error_buffer));
+  bomalloc_strerr(&error_buffer[0], sizeof(error_buffer));
   size_t tsize = snprintf(&master_buffer[0], sizeof(master_buffer), "%s: %s\n", msg, &error_buffer[0]);
   // Get
 
@@ -33,7 +33,7 @@ void noomr_perror(const char * msg) {
 #include <locale.h>
 #include <math.h>
 
-void print_noomr_stats() {
+void print_bomalloc_stats() {
 #ifdef COLLECT_STATS
   shared_data_t snapshot = *shared;
   if (!isatty(fileno(stderr))) {
@@ -41,7 +41,7 @@ void print_noomr_stats() {
   }
   int index;
   setlocale(LC_ALL,"");
-  printf("NOOMR stats\n");
+  printf("BOMALLOC stats\n");
   printf("allocations: %u\n", snapshot.allocations);
   printf("frees: %u\n", snapshot.frees);
   printf("sbrks: %u\n", snapshot.sbrks);
@@ -65,6 +65,6 @@ void print_noomr_stats() {
 #endif
         );
 #else
-  printf("NOOMR not configured to collect statistics\n");
+  printf("BOMALLOC not configured to collect statistics\n");
 #endif
 }

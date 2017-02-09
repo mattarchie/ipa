@@ -7,9 +7,9 @@
 #include <stdio.h>
 
 #include "stack.h"
-#include "noomr.h"
-#include "noomr_sync.h"
-#include "noomr_utils.h"
+#include "bomalloc.h"
+#include "bomalloc_sync.h"
+#include "bomalloc_utils.h"
 #include "memmap.h"
 
 extern size_t my_growth;
@@ -17,7 +17,7 @@ extern shared_data_t * shared;
 
 void beginspec() {
   assert(speculating()); // TODO -- probably special case this function
-  noomr_init();
+  bomalloc_init();
   my_growth = 0;
   map_missing_pages();
   synch_lists();
@@ -44,7 +44,7 @@ static inline void set_large_perm(int flags) {
       data = *block;
       fsync(fd);
       if (!mmap((void *) block, data.huge_block_sz, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0)) {
-        noomr_perror("Unable to reconfigure permissions.");
+        bomalloc_perror("Unable to reconfigure permissions.");
       }
       close(fd);
       block->is_shared = false;

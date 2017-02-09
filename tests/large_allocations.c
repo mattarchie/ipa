@@ -1,6 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include "noomr.h"
+#include "bomalloc.h"
 #include "dummy.h"
 
 #define NUM_ROUNDS 5
@@ -20,12 +20,12 @@ int main() {
 
   for (rnd = 0; rnd < NUM_ROUNDS; rnd++) {
     alloc_size = MAX_SIZE + sizeof(block_t) + 1;
-    int * payload = noomr_malloc(alloc_size);
+    int * payload = bomalloc_malloc(alloc_size);
     ptrs[rnd] = payload;
     for (check = 0; check < rnd; check++) {
       assert(ptrs[check] != payload);
     }
   }
   printf("Basic allocation test passed\n");
-  print_noomr_stats();
+  print_bomalloc_stats();
 }

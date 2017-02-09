@@ -69,15 +69,15 @@ static inline const size_t class_for_size(unsigned x) {
 typedef struct {
   union {
     struct {
-      volatile struct noomr_page_t * next_page;
+      volatile struct bomalloc_page_t * next_page;
       volatile int next_pg_name;
     };
     combined_page_t combined;
   };
-} noomr_page_t;
+} bomalloc_page_t;
 
 typedef union {
-#ifdef NOOMR_ALIGN_HEADERS
+#ifdef BOMALLOC_ALIGN_HEADERS
   //for header alignment to cache line bounds
   void * ____padding[64/sizeof(void*)];
 #endif
@@ -110,11 +110,11 @@ typedef union {
 #endif
 
 #define HEADERS_PER_PAGE ((( PAGE_SIZE) - \
-                          (sizeof(size_t) + sizeof(noomr_page_t))) / sizeof(header_t) \
+                          (sizeof(size_t) + sizeof(bomalloc_page_t))) / sizeof(header_t) \
                           )
 
 typedef struct {
-  noomr_page_t next_page;
+  bomalloc_page_t next_page;
   volatile struct header_page_t * next_header;
   // unsigned number; // to be used used to help minimize the number of header pages?
   size_t next_free;
@@ -128,7 +128,7 @@ typedef struct {
 } block_t;
 
 typedef struct {
-  noomr_page_t next_page;
+  bomalloc_page_t next_page;
   volatile struct huge_block_t * next_block;
   size_t huge_block_sz; //Note: this includes the block_t space
   int file_name; // Might be able to eliminate this field
@@ -144,7 +144,7 @@ typedef unsigned line_int_t __attribute__ ((aligned (64))); //64B aligned int
 
 // Allocated at the start of the program in shared mem.
 typedef struct {
-  noomr_page_t next_page;
+  bomalloc_page_t next_page;
 #ifdef COLLECT_STATS
   volatile line_int_t allocations;
   volatile line_int_t frees;
@@ -155,8 +155,8 @@ typedef struct {
   volatile size_t total_alloc; // total space allocated from the system (heap + mmap)
   volatile uint64_t time_malloc;
 #endif
-  volatile noomr_stack_t seq_free[NUM_CLASSES]; // sequential free list
-  volatile noomr_stack_t spec_free[NUM_CLASSES]; // speculative free list
+  volatile bomalloc_stack_t seq_free[NUM_CLASSES]; // sequential free list
+  volatile bomalloc_stack_t spec_free[NUM_CLASSES]; // speculative free list
   volatile size_t base; //where segment begins (cache)
   volatile size_t spec_growth; // grow (B) done by spec group
   volatile unsigned next_name; // next header file to use
@@ -173,9 +173,9 @@ extern shared_data_t * shared;
 
 // If compiled with the approiate flags, print the stats collected
 // during run time
-void print_noomr_stats(void);
+void print_bomalloc_stats(void);
 bool speculating(void);
-void noomr_init(void);
+void bomalloc_init(void);
 
 // Utility functions
 static inline block_t * getblock(void * user_payload) {
@@ -250,16 +250,16 @@ static inline volatile header_t * seq_node_to_header(volatile node_t * node) {
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
 #define MAX(a,b) ((a) > (b) ? (a) : (b))
 
-void * noomr_malloc(size_t);
-void * noomr_calloc(size_t, size_t);
-void * noomr_realloc(void *, size_t);
-void noomr_free(void *);
-size_t noomr_usable_space(void *);
+void * bomalloc_malloc(size_t);
+void * bomalloc_calloc(size_t, size_t);
+void * bomalloc_realloc(void *, size_t);
+void bomalloc_free(void *);
+size_t bomalloc_usable_space(void *);
 
 void beginspec(void);
 void endspec(void);
 
 void record_allocation(void *, size_t);
 
-void noomr_teardown(void);
+void bomalloc_teardown(void);
 #endif
