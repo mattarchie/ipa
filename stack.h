@@ -1,5 +1,5 @@
-#ifndef ___NOOMR_STACK_H
-#define ___NOOMR_STACK_H
+#ifndef ___BOMALLOC_STACK_H
+#define ___BOMALLOC_STACK_H
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -24,25 +24,25 @@ typedef union {
   };
   combined_stack_t combined;
 }
-#ifdef NOOMR_ALIGN_STACKS
+#ifdef BOMALLOC_ALIGN_STACKS
 __attribute__((aligned (64)))
 #endif
-noomr_stack_t;
+bomalloc_stack_t;
 
 
-static inline bool empty(volatile noomr_stack_t * stack) {
+static inline bool empty(volatile bomalloc_stack_t * stack) {
   return stack->head == NULL;
 }
 
-static inline void init_stack(noomr_stack_t * stack) {
+static inline void init_stack(bomalloc_stack_t * stack) {
   stack->head = NULL;
   stack->age = 0;
 }
 
 // The function below can be used as a more light-weight 'semi-atomic' load without spinning
 //Loading the variable used to prevent the ABA problem first is suffient -- read barrier to prevent proc. reordering
-static inline noomr_stack_t naba_load(volatile noomr_stack_t * stack)  {
-  noomr_stack_t load;
+static inline bomalloc_stack_t naba_load(volatile bomalloc_stack_t * stack)  {
+  bomalloc_stack_t load;
 #if defined(__x86_64__) || defined(__i386__)
   // x86 has a strong enough memory model that a runtime memory fence is not needed.
   // A compiler fence is needed to keep the compiler from reordering
@@ -60,8 +60,8 @@ static inline noomr_stack_t naba_load(volatile noomr_stack_t * stack)  {
   return load;
 }
 
-static inline void push(volatile noomr_stack_t * stack, volatile node_t * item) {
-  noomr_stack_t new_stack, expected;
+static inline void push(volatile bomalloc_stack_t * stack, volatile node_t * item) {
+  bomalloc_stack_t new_stack, expected;
   do {
     expected = naba_load(stack);
     new_stack.age = expected.age + 1;
@@ -72,13 +72,13 @@ static inline void push(volatile noomr_stack_t * stack, volatile node_t * item) 
                                          new_stack.combined));
 }
 
-static inline volatile node_t * pop(volatile noomr_stack_t * stack) {
+static inline volatile node_t * pop(volatile bomalloc_stack_t * stack) {
   while (true) {
-    noomr_stack_t expected = naba_load(stack);
+    bomalloc_stack_t expected = naba_load(stack);
     if (expected.head == NULL) {
       return NULL;
     } else {
-      noomr_stack_t new_stack;
+      bomalloc_stack_t new_stack;
       new_stack.age = expected.age + 1;
       __sync_synchronize(); //More fine-grain than the naba load -- let the 1 happen 'whenever'
       new_stack.head = (node_t *) expected.head->next;
@@ -91,12 +91,12 @@ static inline volatile node_t * pop(volatile noomr_stack_t * stack) {
   }
 }
 
-static inline void push_ageless(noomr_stack_t * stack, node_t * node) {
+static inline void push_ageless(bomalloc_stack_t * stack, node_t * node) {
   node->next = (struct node_t *) stack->head;
   stack->head = node;
 }
 
-static inline volatile node_t * pop_ageless(volatile noomr_stack_t * stack) {
+static inline volatile node_t * pop_ageless(volatile bomalloc_stack_t * stack) {
   if (empty(stack)) {
     return NULL;
   } else {
@@ -107,8 +107,8 @@ static inline volatile node_t * pop_ageless(volatile noomr_stack_t * stack) {
   }
 }
 
-static inline noomr_stack_t * new_stack() {
-  return calloc(1, sizeof(noomr_stack_t));
+static inline bomalloc_stack_t * new_stack() {
+  return calloc(1, sizeof(bomalloc_stack_t));
 }
 
 #endif

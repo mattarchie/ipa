@@ -1,15 +1,15 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include "noomr.h"
+#include "bomalloc.h"
 #include "dummy.h"
 
 int main() {
-  int * payload = noomr_malloc(MAX_SIZE + 1);
-  printf("Noomr payload %p\n", payload);
+  int * payload = bomalloc_malloc(MAX_SIZE + 1);
+  printf("bomalloc payload %p\n", payload);
   *payload = 42;
   printf("Large allocation passed\n");
-  noomr_free(payload);
+  bomalloc_free(payload);
   printf("Successfully freed large block\n");
-  print_noomr_stats();
+  print_bomalloc_stats();
   return 0;
 }

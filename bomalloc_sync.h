@@ -1,5 +1,5 @@
-#ifndef _H_NOOMR_SYNC_H
-#define _H_NOOMR_SYNC_H
+#ifndef _H_BOMALLOC_SYNC_H
+#define _H_BOMALLOC_SYNC_H
 void beginspec();
 void endspec();
 void synch_lists();
@@ -9,7 +9,7 @@ void free_delayed(void);
 static inline void set_large_perm();
 
 extern void * inc_heap(size_t);
-extern void noomr_init(void);
+extern void bomalloc_init(void);
 
 
 #endif

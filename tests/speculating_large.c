@@ -5,8 +5,8 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <errno.h>
-#include "noomr.h"
-#include "noomr_utils.h"
+#include "bomalloc.h"
+#include "bomalloc_utils.h"
 
 #define NUM_ROUNDS 10
 #define NUM_CHILDREN 2
@@ -40,9 +40,9 @@ void __attribute__((noreturn)) child(int id)  {
     ;
   }
   for (int rnd = PER_EACH * id; rnd < PER_EACH * (id + 1); rnd++) {
-    int * payload = noomr_malloc(alloc_size);
+    int * payload = bomalloc_malloc(alloc_size);
     printf("rnd %d Allocated %p\n", rnd, payload);
-    assert(noomr_usable_space(payload) >= alloc_size);
+    assert(bomalloc_usable_space(payload) >= alloc_size);
     *payload = 0xdeadbeef;
   }
   printf("Child %d exits\n", id);
@@ -66,7 +66,7 @@ int main() {
   int status;
   while (wait(&status) == 0) {
     if (errno != ECHILD) {
-      noomr_perror("Unexpected error");
+      bomalloc_perror("Unexpected error");
       exit(-1);
     }
     assert(WIFEXITED(status));
@@ -75,5 +75,5 @@ int main() {
   endspec();
   spec = false;
   printf("Large spec allocation test passed!\n");
-  print_noomr_stats();
+  print_bomalloc_stats();
 }

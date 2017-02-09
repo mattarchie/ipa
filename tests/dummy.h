@@ -1,5 +1,5 @@
-#ifndef __NOOMR_TEST_DUMMY
-#define __NOOMR_TEST_DUMMY
+#ifndef __BOMALLOC_TEST_DUMMY
+#define __BOMALLOC_TEST_DUMMY
 #include <stdbool.h>
 #include <stdlib.h>
 #include <unistd.h>

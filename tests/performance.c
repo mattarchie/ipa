@@ -1,6 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include "noomr.h"
+#include "bomalloc.h"
 #include "dummy.h"
 
 #define NUM_ROUNDS 100000
@@ -22,8 +22,8 @@ int main() {
 
   for (rnd = 0; rnd < NUM_ROUNDS; rnd++) {
     alloc_size = class_for_rnd(rnd);
-    noomr_malloc(alloc_size);
+    bomalloc_malloc(alloc_size);
   }
   printf("Performance test complete\n");
-  print_noomr_stats();
+  print_bomalloc_stats();
 }

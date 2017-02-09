@@ -1,6 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include "noomr.h"
+#include "bomalloc.h"
 #include "dummy.h"
 
 #define NUM_ROUNDS 2500
@@ -34,8 +34,8 @@ int main() {
 
   for (rnd = 0; rnd < NUM_ROUNDS; rnd++) {
     alloc_size = uniform_size_class();
-    int * payload = noomr_malloc(alloc_size);
-    size_t usable = noomr_usable_space(payload);
+    int * payload = bomalloc_malloc(alloc_size);
+    size_t usable = bomalloc_usable_space(payload);
     assert(payload != NULL);
     assert(usable >= alloc_size);
     ptrs[rnd] = payload;
@@ -48,5 +48,5 @@ int main() {
     *payload = 42;
   }
   printf("Basic allocation test passed\n");
-  print_noomr_stats();
+  print_bomalloc_stats();
 }

@@ -2,8 +2,8 @@ ifneq ($(TRAVIS_CI), 1)
 	CC = gcc
 endif
 
-INCFLAGS = -I./ -I./noomr
-DEFS = -DCOLLECT_STATS -DNOOMR_SYSTEM_ALLOC -DNO_HOOK -DDEBUG
+INCFLAGS = -I./ -I./bomalloc
+DEFS = -DCOLLECT_STATS -DBOMALLOC_SYSTEM_ALLOC -DNO_HOOK -DDEBUG
 OPT_FLAGS = -O3 -fno-strict-aliasing -fno-strict-overflow -march=native
 DEBUG_FLAGS = -ggdb3 -g3
 CFLAGS = $(OPT_FLAGS) $(DEBUG_FLAGS) -fPIC -Wall -Wno-unused-function -Wno-deprecated-declarations $(INCFLAGS) $(DEFS)
@@ -15,13 +15,13 @@ TEST_BINARIES = $(basename $(TEST_SOURCE))
 TEST_OBJECTS = $(patsubst %.c,%.o, $(TEST_SOURCE))
 DEP = $(SOURCE:.c=.d) $(TEST_SOURCE:.c=.d)
 
-OBJECTS = noomr.o memmap.o noomr_utils.o noomr_sync.o noomr_overrides.o
+OBJECTS = bomalloc.o memmap.o bomalloc_utils.o bomalloc_sync.o bomalloc_overrides.o
 LDFLAGS = -Wl,--no-as-needed -ldl -rdynamic -lm
-LIBRARY = libnoomr.a
+LIBRARY = libbomalloc.a
 
 default: $(LIBRARY)
 
-libnoomr.a: $(OBJECTS)
+libbomalloc.a: $(OBJECTS)
 	@echo Building library $@
 	@ar rcs $@ $?
 	@ranlib $@

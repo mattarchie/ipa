@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <unistd.h>
-#include "noomr.h"
+#include "bomalloc.h"
 
 #if __WORDSIZE == 64
 #define NUM_ROUNDS 200
@@ -40,7 +40,7 @@ int getuniqueid() {
 }
 
 int main() {
-  int * sequential = noomr_malloc(sizeof(int));
+  int * sequential = bomalloc_malloc(sizeof(int));
   int * ptrs[NUM_ROUNDS] = {NULL};
   ptrs[0] = sequential;
   spec = true;
@@ -54,8 +54,8 @@ int main() {
 
   for (rnd = 1; rnd < NUM_ROUNDS; rnd++) {
     alloc_size = uniform_size_class();
-    int * payload = noomr_malloc(alloc_size);
-    assert(noomr_usable_space(payload) >= alloc_size);
+    int * payload = bomalloc_malloc(alloc_size);
+    assert(bomalloc_usable_space(payload) >= alloc_size);
     ptrs[rnd] = payload;
     for (check = 0; check < rnd; check++) {
       if (ptrs[check] == payload) {
@@ -68,5 +68,5 @@ int main() {
   endspec();
   spec = false;
   printf("Small spec allocation test passed! No duplicate allocations detected\n");
-  print_noomr_stats();
+  print_bomalloc_stats();
 }
