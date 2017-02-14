@@ -96,10 +96,6 @@ typedef union {
   Additionally, the header page struct keeps track of the next unallocated
   header index within this page.
 
-
-
-  A header page is defined to be no more than PAGE_SIZE in length,
-  and to fit the maximum number of headers as possible.
 */
 
 #if __SIZEOF_POINTER__ == 8
@@ -110,7 +106,7 @@ typedef union {
 #endif
 
 #ifndef PAGES_PER_HPG
-#define PAGES_PER_HPG 1
+#define PAGES_PER_HPG 5
 #endif
 #define HEADERS_PER_PAGE ((( PAGES_PER_HPG * PAGE_SIZE) - \
                           (sizeof(size_t) + sizeof(void*) + sizeof(bomalloc_page_t))) / sizeof(header_t) \

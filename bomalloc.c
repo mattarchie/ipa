@@ -243,7 +243,6 @@ void * bomalloc_malloc(size_t size) {
 }
 
 void bomalloc_free(void * payload) {
-  return; // TODO remove
 #ifdef COLLECT_STATS
   __sync_add_and_fetch(&shared->frees, 1);
 #endif
