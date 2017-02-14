@@ -54,8 +54,8 @@ tests: $(TEST_OBJECTS) $(TEST_BINARIES)
 
 
 test: $(TEST_BINARIES)
-	@echo Test binaries: $(sort $(filter-out speculating_large, $(notdir $(TEST_BINARIES))))
-	@ruby tests/test_runner.rb $(filter-out tests/speculating_large, $(sort $(TEST_BINARIES)))
+	@echo Test binaries: $(sort $(notdir $(TEST_BINARIES)))
+	@ruby tests/test_runner.rb $(sort $(TEST_BINARIES))
 
 clean:
 	rm -f $(TEST_OBJECTS) $(TEST_BINARIES) $(OBJECTS) gmon.out $(LIBRARY)

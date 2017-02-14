@@ -49,9 +49,13 @@ void __attribute__((noreturn)) child(int id)  {
   exit(0);
 }
 
+pid_t parent;
+
 int main() {
   srand(0);
   spec = true;
+  pid_t children[NUM_CHILDREN];
+  parent = getpid();
   beginspec();
   for (int i = 0; i < NUM_CHILDREN; i++) {
     pid_t pid = fork();
@@ -61,12 +65,13 @@ int main() {
       perror("Unable to fork process");
       exit(-1);
     }
+    children[i] = pid;
   }
   shared->dummy = 1;
   int status;
-  while (wait(&status) == 0) {
-    if (errno != ECHILD) {
-      bomalloc_perror("Unexpected error");
+  for (int i = 0; i < NUM_CHILDREN; i++) {
+    if (waitpid(children[i], &status, 0) == -1) {
+      perror("Unable to wait for child");
       exit(-1);
     }
     assert(WIFEXITED(status));

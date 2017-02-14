@@ -116,6 +116,24 @@ void map_handler(int x) {
   map_now(map_info);
 }
 
+void segv_bool_test(int x) {
+  is_mapped_bool = false;
+}
+
+bool is_addr_mapped(volatile void * address) {
+  is_mapped_bool = true;
+  typeof(&segv_bool_test) old = signal(SIGSEGV, segv_bool_test);
+  if (old == SIG_ERR) {
+    bomalloc_perror("Unable to install signal handler");
+    abort();
+  }
+  __sync_synchronize();
+  volatile int __attribute__((__unused__)) data = *(int *) address;
+  __sync_synchronize();
+  signal(SIGSEGV, old);
+  return is_mapped_bool;
+}
+
 bool is_mapped_segv_check(volatile bomalloc_page_t * prev)  {
   map_info = prev;
   is_mapped_bool = true;
