@@ -109,8 +109,11 @@ typedef union {
 #define combinded_header_next_t uint64_t
 #endif
 
-#define HEADERS_PER_PAGE ((( PAGE_SIZE) - \
-                          (sizeof(size_t) + sizeof(bomalloc_page_t))) / sizeof(header_t) \
+#ifndef PAGES_PER_HPG
+#define PAGES_PER_HPG 1
+#endif
+#define HEADERS_PER_PAGE ((( PAGES_PER_HPG * PAGE_SIZE) - \
+                          (sizeof(size_t) + sizeof(void*) + sizeof(bomalloc_page_t))) / sizeof(header_t) \
                           )
 
 typedef struct {
@@ -121,7 +124,7 @@ typedef struct {
   header_t headers[HEADERS_PER_PAGE];
 } header_page_t;
 
-// _Static_assert(sizeof(header_page_t) <= PAGE_SIZE, "Header pages not configured correctly");
+_Static_assert(sizeof(header_page_t) <= (PAGES_PER_HPG *PAGE_SIZE), "Header pages not configured correctly");
 
 typedef struct {
   header_t * header;
