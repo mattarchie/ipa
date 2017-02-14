@@ -192,7 +192,9 @@ static void map_now (volatile bomalloc_page_t * last_page) {
   }
 }
 static inline bool full_map_check(volatile bomalloc_page_t * prev) {
-  if (is_mapped((void *) prev->next_page)) {
+  if (prev->next_pg_name == -1) {
+    return true;
+  } else if (is_mapped((void *) prev->next_page)) {
     return true;
   } else {
     return is_mapped_segv_check(prev);
@@ -248,7 +250,7 @@ static inline bomalloc_page_t * allocate_bomalloc_page(int file_no, size_t minsi
   size_t allocation_size = MAX(minsize, PAGE_SIZE);
   assert(allocation_size % PAGE_SIZE == 0);
   assert(shared != NULL);
-  if (false && !speculating()) {
+  if (!speculating()) {
     flags |= MAP_ANONYMOUS;
   } else {
     flags &= ~MAP_PRIVATE;
@@ -301,7 +303,7 @@ static inline bomalloc_page_t * allocate_bomalloc_page(int file_no, size_t minsi
 }
 
 void allocate_header_page() {
-  const int file_no = __sync_add_and_fetch(&shared->next_name, 1);
+  const int file_no = !speculating() ? -1 : __sync_add_and_fetch(&shared->next_name, 1);
   header_page_t * headers = (header_page_t *) allocate_bomalloc_page(file_no, MAX(PAGE_SIZE, sizeof(header_page_t)), MAP_SHARED);
   _Static_assert(__builtin_offsetof(header_page_t, next_page) == 0, "Offset must be 0");
   if (headers == (header_page_t *) -1) {
@@ -327,7 +329,7 @@ void allocate_header_page() {
 }
 
 huge_block_t * allocate_large(size_t size) {
-  int file_no =  __sync_add_and_fetch(&shared->next_name, 1);
+  int file_no = !speculating() ? -1 : __sync_add_and_fetch(&shared->next_name, 1);
   // Align to a page size
   size_t alloc_size = PAGE_ALIGN((size + sizeof(huge_block_t)));
   assert(alloc_size > size);
