@@ -65,7 +65,7 @@ int main() {
     }
     *payload = 0xdeadbeef;
   }
-  endspec();
+  endspec(true);
   spec = false;
   printf("Small spec allocation test passed! No duplicate allocations detected\n");
   print_bomalloc_stats();

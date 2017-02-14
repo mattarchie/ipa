@@ -260,7 +260,7 @@ void bomalloc_free(void *);
 size_t bomalloc_usable_space(void *);
 
 void beginspec(void);
-void endspec(void);
+void endspec(bool);
 
 void record_allocation(void *, size_t);
 

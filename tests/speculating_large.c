@@ -77,7 +77,7 @@ int main() {
     assert(WIFEXITED(status));
     assert(WEXITSTATUS(status) == 0);
   }
-  endspec();
+  endspec(true);
   spec = false;
   printf("Large spec allocation test passed!\n");
   print_bomalloc_stats();

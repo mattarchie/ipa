@@ -1,7 +1,9 @@
 #ifndef _H_BOMALLOC_SYNC_H
 #define _H_BOMALLOC_SYNC_H
+#include <stdbool.h>
+
 void beginspec();
-void endspec();
+void endspec(bool);
 void synch_lists();
 void promote_list();
 void free_delayed(void);

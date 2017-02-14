@@ -24,14 +24,18 @@ void beginspec() {
   // set_large_perm(MAP_PRIVATE);
 }
 
-void endspec() {
+void endspec(bool ppr_won) {
   assert(speculating()); // TODO -- probably special case this function
   if (my_growth < shared->spec_growth) {
     inc_heap(shared->spec_growth - my_growth);
   }
   map_missing_pages();
   free_delayed();
-  promote_list();
+  if (ppr_won) {
+    promote_list();
+  } else {
+    synch_lists();
+  }
   // set_large_perm(MAP_PRIVATE);
 }
 
@@ -55,6 +59,7 @@ static inline void set_large_perm(int flags) {
 void synch_lists() {
   size_t i;
   volatile header_page_t * page;
+  volatile header_t * header;
   // Set the heads of the stacks to the corresponding elements
   for (i = 0; i < NUM_CLASSES; i++) {
     if(shared->seq_free[i].head != NULL) {
@@ -67,11 +72,12 @@ void synch_lists() {
   // Set the stack elements
   for (page = shared->header_pg; page != NULL; page = (header_page_t *) page->next_header) {
     for (i = 0; i < MIN(HEADERS_PER_PAGE, page->next_free); i++) {
-      if (!seq_alloced(&page->headers[i]) && page->headers[i].seq_next.next != NULL) {
-        volatile header_t * next_header = seq_node_to_header((node_t*) page->headers[i].seq_next.next);
-        page->headers[i].spec_next.next = (volatile struct node_t *) &next_header->spec_next;
+      header = &page->headers[i];
+      if (!seq_alloced(header) && header->seq_next.next != NULL) {
+        volatile header_t * next_header = seq_node_to_header((node_t*) header->seq_next.next);
+        header->spec_next.next = (volatile struct node_t *) &next_header->spec_next;
       } else {
-        page->headers[i].spec_next.next = NULL;
+        header->spec_next.next = NULL;
       }
     }
   }
@@ -84,6 +90,7 @@ void synch_lists() {
 void promote_list() {
   size_t i;
   volatile header_page_t * page;
+  volatile header_t * header;
   map_missing_pages();
   // Set the heads of the stacks to the corresponding elements
   for (i = 0; i < NUM_CLASSES; i++) {
@@ -96,13 +103,16 @@ void promote_list() {
   // Set the stack elements
   for (page = shared->header_pg; page != NULL; page = (header_page_t *) page->next_header) {
     for (i = 0; i < MIN(HEADERS_PER_PAGE, page->next_free); i++) {
-      assert(payload(&page->headers[i]) != NULL);
-      if (!spec_alloced(&page->headers[i]) && page->headers[i].seq_next.next != NULL) {
-        volatile header_t * next_header = spec_node_to_header((node_t *) page->headers[i].spec_next.next);
-        page->headers[i].seq_next.next = (volatile struct node_t *) &next_header->seq_next;
+      header = &page->headers[i];
+      assert(payload(header) != NULL);
+      if (!spec_alloced(header) && header->seq_next.next != NULL) {
+        volatile header_t * next_header = spec_node_to_header((node_t *) header->spec_next.next);
+        header->seq_next.next = (volatile struct node_t *) &next_header->seq_next;
       } else {
-        page->headers[i].seq_next.next = NULL;
+        header->seq_next.next = NULL;
       }
+      header->payload = (void *) (((intptr_t) header->payload) & ~(SEQ_ALLOC_B | SPEC_ALLOC_B));
+      header->allocator = 0;
     }
   }
 }
