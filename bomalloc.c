@@ -100,7 +100,9 @@ static void map_headers(char * begin, size_t index, size_t num_blocks) {
         }
       }
       if (page == NULL) {
-        allocate_header_page();
+        page = allocate_header_page();
+        header_index = 0;
+        goto found;
       }
     }
     found: block = (block_t *) (&begin[i * block_size]);
@@ -133,9 +135,11 @@ static void map_headers(char * begin, size_t index, size_t num_blocks) {
 
 void bomalloc_init() {
   if (shared == NULL) {
-    shared = mmap(NULL, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    shared = mmap(NULL,
+              MAX(sizeof(shared_data_t), PAGE_SIZE),
+              PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
     bzero(shared, PAGE_SIZE);
-    shared->number_mmap = 1;
+    shared->number_mmap = ceil(((double) sizeof(shared_data_t)) / PAGE_SIZE);
     shared->base = (size_t) sbrk(0); // get the starting address
 #ifdef COLLECT_STATS
     shared->total_alloc = PAGE_SIZE;

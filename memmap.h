@@ -5,7 +5,7 @@
 
 #include "bomalloc.h"
 
-void allocate_header_page(void);
+header_page_t * allocate_header_page(void);
 huge_block_t * allocate_large(size_t);
 int getuniqueid(void);
 int mmap_fd(unsigned, size_t);

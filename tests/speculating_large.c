@@ -81,4 +81,5 @@ int main() {
   spec = false;
   printf("Large spec allocation test passed!\n");
   print_bomalloc_stats();
+  bomalloc_teardown();
 }

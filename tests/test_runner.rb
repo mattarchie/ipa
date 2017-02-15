@@ -8,7 +8,8 @@ end
 
 class NoomrTests < Test::Unit::TestCase
   ARGV.each{ |binary|
-    define_method("#{binary}"){
+    define_method("#{binary}") {
+      
       assert_equal true, run_script(binary)
     }
   }

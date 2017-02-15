@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <unistd.h>
 #include "bomalloc.h"
+#include "teardown.h"
 
 #if __WORDSIZE == 64
 #define NUM_ROUNDS 200

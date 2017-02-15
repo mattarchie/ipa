@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include "bomalloc.h"
 #include "dummy.h"
+#include "teardown.h"
 
 #define NUM_ROUNDS 50000
 

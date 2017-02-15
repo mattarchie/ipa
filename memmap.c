@@ -268,7 +268,7 @@ static inline bomalloc_page_t * allocate_bomalloc_page(int file_no, size_t minsi
   size_t allocation_size = MAX(minsize, PAGE_SIZE);
   assert(allocation_size % PAGE_SIZE == 0);
   assert(shared != NULL);
-  if (!speculating()) {
+  if (!speculating() && file_no != -1) {
     flags |= MAP_ANONYMOUS;
   } else {
     flags &= ~MAP_PRIVATE;
@@ -276,6 +276,7 @@ static inline bomalloc_page_t * allocate_bomalloc_page(int file_no, size_t minsi
   }
   file_descriptor = mmap_fd(file_no, allocation_size);
   volatile bomalloc_page_t * last_page;
+  volatile int unmaps = 0;
   while (true) {
     last_page = map_missing_pages();
     /**
@@ -300,11 +301,16 @@ static inline bomalloc_page_t * allocate_bomalloc_page(int file_no, size_t minsi
       abort();
     }
     if (__sync_bool_compare_and_swap(&last_page->combined, expected.combined, alloc.combined)) {
+      if (last_page == (volatile bomalloc_page_t *) last_page->next_page) {
+        abort();
+      }
+
       break;
     } else {
       munmap(allocation, allocation_size);
-    }
+      unmaps++;
   }
+    }
 #ifdef COLLECT_STATS
   __sync_add_and_fetch(&shared->total_alloc, allocation_size);
   __sync_add_and_fetch(&shared->number_mmap, 1);
@@ -320,15 +326,16 @@ static inline bomalloc_page_t * allocate_bomalloc_page(int file_no, size_t minsi
   return allocation;
 }
 
-void allocate_header_page() {
-  const int file_no = !speculating() ? -1 : __sync_add_and_fetch(&shared->next_name, 1);
+header_page_t * allocate_header_page() {
+  // headers are always shared -- always increment name
+  const int file_no = __sync_add_and_fetch(&shared->next_name, 1);
   header_page_t * headers = (header_page_t *) allocate_bomalloc_page(file_no, MAX(PAGE_SIZE, sizeof(header_page_t)), MAP_SHARED);
   _Static_assert(__builtin_offsetof(header_page_t, next_page) == 0, "Offset must be 0");
   if (headers == (header_page_t *) -1) {
     exit(-1);
   }
   bzero(headers, PAGE_SIZE);
-  headers->next_free = 0;
+  headers->next_free = 1;
   // Add increate_header_pgto the headers linked list
   if (shared->header_pg == NULL) {
     shared->header_pg = headers;
@@ -344,10 +351,11 @@ void allocate_header_page() {
 #ifdef COLLECT_STATS
   __sync_add_and_fetch(&shared->header_pages, 1);
 #endif
+  return headers;
 }
 
 huge_block_t * allocate_large(size_t size) {
-  int file_no = !speculating() ? -1 : __sync_add_and_fetch(&shared->next_name, 1);
+  int file_no =  __sync_add_and_fetch(&shared->next_name, 1);
   // Align to a page size
   size_t alloc_size = PAGE_ALIGN((size + sizeof(huge_block_t)));
   assert(alloc_size > size);
@@ -358,7 +366,7 @@ huge_block_t * allocate_large(size_t size) {
   }
   block->huge_block_sz = alloc_size;
   block->file_name = file_no;
-  block->is_shared = speculating();
+  block->is_shared = file_no == -1;
   do {
     block->next_block = (volatile struct huge_block_t *) shared->large_block;
   } while(!__sync_bool_compare_and_swap(&shared->large_block, block->next_block, block));

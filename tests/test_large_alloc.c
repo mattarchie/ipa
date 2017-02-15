@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include "bomalloc.h"
 #include "dummy.h"
+#include "teardown.h"
 
 int main() {
   int * payload = bomalloc_malloc(MAX_SIZE + 1);

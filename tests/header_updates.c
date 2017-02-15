@@ -6,6 +6,7 @@
 
 #include "bomalloc.h"
 #include "dummy.h"
+#include "teardown.h"
 
 
 void parent(int * payload1, pid_t child, void* value) {
