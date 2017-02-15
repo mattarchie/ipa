@@ -21,7 +21,7 @@ void beginspec() {
   my_growth = 0;
   map_missing_pages();
   synch_lists();
-  // set_large_perm(MAP_PRIVATE);
+  set_large_perm(MAP_PRIVATE);
 }
 
 void endspec(bool ppr_won) {
@@ -33,10 +33,7 @@ void endspec(bool ppr_won) {
   free_delayed();
   if (ppr_won) {
     promote_list();
-  } else {
-    synch_lists();
   }
-  // set_large_perm(MAP_PRIVATE);
 }
 
 static inline void set_large_perm(int flags) {
