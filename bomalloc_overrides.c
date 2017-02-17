@@ -4,20 +4,20 @@
 #if defined(__GNUC__) && !defined(NO_HOOK)
 #include <malloc.h>
 
-static void * bomalloc_malloc_hook (size_t size, const void * c){
-  return bomalloc_malloc(size);
+static void * bomalloc_hook (size_t size, const void * c){
+  return bomalloc(size);
 }
 
-static void bomalloc_free_hook (void* payload, const void * c){
-  bomalloc_free(payload);
+static void bofree_hook (void* payload, const void * c){
+  bofree(payload);
 }
 
-static void * bomalloc_realloc_hook(void * payload, size_t size, const void * c) {
-  return bomalloc_realloc(payload, size);
+static void * borealloc_hook(void * payload, size_t size, const void * c) {
+  return borealloc(payload, size);
 }
 
-static void * bomalloc_calloc_hook(size_t a, size_t b, const void * c) {
-  return bomalloc_calloc(a, b);
+static void * bocalloc_hook(size_t a, size_t b, const void * c) {
+  return bocalloc(a, b);
 }
 
 static void bomalloc_dehook() {
@@ -32,30 +32,30 @@ static void bomalloc_dehook() {
 
 void __attribute__((constructor)) bomalloc_hook() {
   atexit(bomalloc_dehook);
-  __malloc_hook = bomalloc_malloc_hook;
-  __free_hook = bomalloc_free_hook;
-  __realloc_hook = bomalloc_realloc_hook;
+  __malloc_hook = bomalloc_hook;
+  __free_hook = bofree_hook;
+  __realloc_hook = borealloc_hook;
 #ifdef __calloc_hook
-  __calloc_hook = bomalloc_calloc_hook;
+  __calloc_hook = bocalloc_hook;
 #endif
 }
 
 #else
 
 void * malloc(size_t t) {
-  return bomalloc_malloc(t);
+  return bomalloc(t);
 }
 void free(void * p) {
-  bomalloc_free(p);
+  bofree(p);
 }
 size_t malloc_usable_size(void * p) {
   return bomalloc_usable_space(p);
 }
 void * realloc(void * p, size_t size) {
-  return bomalloc_realloc(p, size);
+  return borealloc(p, size);
 }
 void * calloc(size_t a, size_t b) {
-  return bomalloc_calloc(a, b);
+  return bocalloc(a, b);
 }
 #endif
 #endif

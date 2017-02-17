@@ -41,7 +41,7 @@ int getuniqueid() {
 }
 
 int main() {
-  int * sequential = bomalloc_malloc(sizeof(int));
+  int * sequential = bomalloc(sizeof(int));
   int * ptrs[NUM_ROUNDS] = {NULL};
   ptrs[0] = sequential;
   spec = true;
@@ -55,7 +55,7 @@ int main() {
 
   for (rnd = 1; rnd < NUM_ROUNDS; rnd++) {
     alloc_size = uniform_size_class();
-    int * payload = bomalloc_malloc(alloc_size);
+    int * payload = bomalloc(alloc_size);
     assert(bomalloc_usable_space(payload) >= alloc_size);
     ptrs[rnd] = payload;
     for (check = 0; check < rnd; check++) {

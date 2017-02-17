@@ -1,3 +1,5 @@
+
+#define _GNU_SOURCE
 #include <stdlib.h>
 #include <sys/mman.h>
 #include <stdio.h>
@@ -12,14 +14,21 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <errno.h>
+#include <signal.h>
+
 #include "bomalloc.h"
 #include "memmap.h"
 #include "bomalloc_utils.h"
 
+
+
+static void map_now(volatile bomalloc_page_t *);
 extern shared_data_t * shared;
 extern bool speculating(void);
 extern void bomalloc_init(void);
 
+static volatile bomalloc_page_t * map_info;
+static bool is_mapped_bool;
 
 static inline int mkdir_ne(char * path, int flags) {
   struct stat st = {0};
@@ -102,14 +111,6 @@ int mmap_fd_bool(unsigned file_no, size_t size, bool no_fd) {
 int mmap_fd(unsigned name, size_t size) {
   return mmap_fd_bool(name, size, false);
 }
-
-#define _GNU_SOURCE
-#include <signal.h>
-
-static volatile bomalloc_page_t * map_info;
-static bool is_mapped_bool;
-
-static void map_now(volatile bomalloc_page_t *);
 
 void map_handler(int x) {
   is_mapped_bool = false;

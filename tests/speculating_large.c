@@ -40,7 +40,7 @@ void __attribute__((noreturn)) child(int id)  {
     ;
   }
   for (int rnd = PER_EACH * id; rnd < PER_EACH * (id + 1); rnd++) {
-    int * payload = bomalloc_malloc(alloc_size);
+    int * payload = bomalloc(alloc_size);
     printf("rnd %d Allocated %p\n", rnd, payload);
     assert(bomalloc_usable_space(payload) >= alloc_size);
     *payload = 0xdeadbeef;

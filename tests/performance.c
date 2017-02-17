@@ -23,7 +23,7 @@ int main() {
 
   for (rnd = 0; rnd < NUM_ROUNDS; rnd++) {
     alloc_size = class_for_rnd(rnd);
-    bomalloc_malloc(alloc_size);
+    bomalloc(alloc_size);
   }
   printf("Performance test complete\n");
   print_bomalloc_stats();

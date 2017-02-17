@@ -5,10 +5,10 @@
 #include "teardown.h"
 
 int main() {
-  int * payload = bomalloc_malloc(sizeof(int));
+  int * payload = bomalloc(sizeof(int));
   printf("bomalloc payload %p\n", payload);
   *payload = 42;
-  bomalloc_free(payload);
+  bofree(payload);
   printf("Basic free test passed\n");
   return 0;
 }

@@ -21,7 +21,7 @@ int main() {
 
   for (rnd = 0; rnd < NUM_ROUNDS; rnd++) {
     alloc_size = MAX_SIZE + sizeof(block_t) + 1;
-    int * payload = bomalloc_malloc(alloc_size);
+    int * payload = bomalloc(alloc_size);
     ptrs[rnd] = payload;
     for (check = 0; check < rnd; check++) {
       assert(ptrs[check] != payload);

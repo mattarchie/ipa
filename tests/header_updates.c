@@ -20,7 +20,7 @@ void parent(int * payload1, pid_t child, void* value) {
 extern shared_data_t * shared;
 
 int main() {
-  int * payload1 = bomalloc_malloc(sizeof(int));
+  int * payload1 = bomalloc(sizeof(int));
   void * value = main;
   pid_t child = fork();
   if (child == 0) {

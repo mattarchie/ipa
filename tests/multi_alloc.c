@@ -27,14 +27,14 @@ int main() {
 
   srand(0);
 
-  int * p1 = bomalloc_malloc(sizeof(int));
-  int * p2 = bomalloc_malloc(sizeof(int));
+  int * p1 = bomalloc(sizeof(int));
+  int * p2 = bomalloc(sizeof(int));
   assert(p1 != p2);
   int * ptrs[NUM_ROUNDS] = {NULL};
 
   for (rnd = 0; rnd < NUM_ROUNDS; rnd++) {
     alloc_size = uniform_size_class();
-    int * payload = bomalloc_malloc(alloc_size);
+    int * payload = bomalloc(alloc_size);
     assert(bomalloc_usable_space(payload) >= alloc_size);
     ptrs[rnd] = payload;
     for (check = 0; check < rnd; check++) {

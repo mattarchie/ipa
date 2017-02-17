@@ -15,8 +15,6 @@
 #include "timing.h"
 
 
-#define max(a, b) ((a) > (b) ? (a) : (b))
-
 shared_data_t * shared;
 size_t my_growth;
 
@@ -70,11 +68,6 @@ size_t bomalloc_usable_space(void * payload) {
   }
 }
 
-/**
- NOTE: when in spec the headers pointers will not be
- into all process's private address space
- To solve this, promise all spec-growth regions
-*/
 static void map_headers(char * begin, size_t index, size_t num_blocks) {
   size_t i, header_index = -1;
   volatile header_page_t * page;
@@ -154,7 +147,7 @@ static void grow(size_t aligned) {
   size_t index = class_for_size(aligned);
   size_t size = CLASS_TO_SIZE(index);
   assert(size > 0);
-  size_t blocks = MIN(HEADERS_PER_PAGE, max(1024 / size, 15));
+  size_t blocks = MIN(HEADERS_PER_PAGE, MAX(1024 / size, 15));
 
   size_t my_region_size = size * blocks;
   if (speculating()) {
@@ -190,7 +183,7 @@ size_t stack_for_size(size_t min_size) {
   return CLASS_TO_SIZE(klass);
 }
 
-void * bomalloc_malloc(size_t size) {
+void * bomalloc(size_t size) {
   volatile header_t * header;
   size_t aligned = ALIGN(size + sizeof(block_t));
   if (shared == NULL) {
@@ -246,7 +239,7 @@ void * bomalloc_malloc(size_t size) {
   }
 }
 
-void bomalloc_free(void * payload) {
+void bofree(void * payload) {
 #ifdef COLLECT_STATS
   __sync_add_and_fetch(&shared->frees, 1);
 #endif
@@ -302,8 +295,8 @@ void free_delayed() {
   }
 }
 
-void * bomalloc_calloc(size_t nmemb, size_t size) {
-  void * payload = bomalloc_malloc(nmemb * size);
+void * bocalloc(size_t nmemb, size_t size) {
+  void * payload = bomalloc(nmemb * size);
   if (payload != NULL) {
     memset(payload, 0, bomalloc_usable_space(payload));
   }
@@ -311,14 +304,14 @@ void * bomalloc_calloc(size_t nmemb, size_t size) {
 }
 
 
-void * bomalloc_realloc(void * p, size_t size) {
+void * borealloc(void * p, size_t size) {
   size_t original_size = bomalloc_usable_space(p);
   if (original_size >= size) {
     return p;
   } else {
-    void * new_payload = bomalloc_malloc(size);
+    void * new_payload = bomalloc(size);
     memcpy(new_payload, p, original_size);
-    bomalloc_free(p);
+    bofree(p);
     return new_payload;
   }
 }

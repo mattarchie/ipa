@@ -35,7 +35,7 @@ int main() {
 
   for (rnd = 0; rnd < NUM_ROUNDS; rnd++) {
     alloc_size = uniform_size_class();
-    int * payload = bomalloc_malloc(alloc_size);
+    int * payload = bomalloc(alloc_size);
     size_t usable = bomalloc_usable_space(payload);
     assert(payload != NULL);
     assert(usable >= alloc_size);

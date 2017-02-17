@@ -249,10 +249,10 @@ static inline volatile header_t * seq_node_to_header(volatile node_t * node) {
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
 #define MAX(a,b) ((a) > (b) ? (a) : (b))
 
-void * bomalloc_malloc(size_t);
-void * bomalloc_calloc(size_t, size_t);
-void * bomalloc_realloc(void *, size_t);
-void bomalloc_free(void *);
+void * bomalloc(size_t);
+void * bocalloc(size_t, size_t);
+void * borealloc(void *, size_t);
+void bofree(void *);
 size_t bomalloc_usable_space(void *);
 
 void beginspec(void);
