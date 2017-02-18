@@ -7,6 +7,8 @@
 #include <string.h>
 #include <assert.h>
 #include <error.h>
+#include <ftw.h>
+#include <unistd.h>
 
 #include "bomalloc.h"
 #include "memmap.h"
@@ -17,6 +19,8 @@
 
 shared_data_t * shared;
 size_t my_growth;
+
+extern header_page_t * seq_headers;
 
 static bomalloc_stack_t delayed_frees_unclaimable[NUM_CLASSES] = {0};
 static bomalloc_stack_t delayed_frees_reclaimable[NUM_CLASSES] = {0};
@@ -43,9 +47,15 @@ static inline volatile header_t * alloc_pop(size_t size) {
       return spec_node_to_header(pop(&shared->spec_free[index]));
     }
   } else {
-    // In CBOP, the monitor proces and the worker process will be using the
-    // sequential free list -- need synchronization
-     return seq_node_to_header(pop(&shared->seq_free[index]));
+    // Because pages are never backed to disk and the shared
+    // lists are now only used by the speculative group,
+    // the monitor process and a seq. program will see different
+    // free lists / header pages meaning we do not need to synchronize
+#ifdef SUPPORT_THREADS
+    return seq_node_to_header(pop(&shared->seq_free[index]));
+#else
+   return seq_node_to_header(pop_ageless(&shared->seq_free[index]));
+#endif
   }
 }
 
@@ -79,13 +89,14 @@ static void map_headers(char * begin, size_t index, size_t num_blocks) {
   assert(block_size == ALIGN(block_size));
   volatile header_t * header = NULL;
   const bool am_spec = speculating();
+  volatile header_page_t * start_page = am_spec ? shared->header_pg : seq_headers;
   for (i = 0; i < num_blocks; i++) {
     while(header_index >= (HEADERS_PER_PAGE - 1) || header_index == -1) {
-      for (page = shared->header_pg; page != NULL; page = (volatile header_page_t *) page->next_header) {
-        while (!is_mapped((void *) page)) {
+      for (page = start_page; page != NULL; page = (volatile header_page_t *) page->next_header) {
+        while (am_spec && !is_mapped((void *) page)) {
           map_missing_pages();
         }
-        if (page->next_free < HEADERS_PER_PAGE - 1) {
+        if (page->next_free <= HEADERS_PER_PAGE - 1) {
           header_index = __sync_fetch_and_add(&page->next_free, 1);
           if (header_index < HEADERS_PER_PAGE) {
             goto found;
@@ -135,7 +146,7 @@ void bomalloc_init() {
     shared->number_mmap = ceil(((double) sizeof(shared_data_t)) / PAGE_SIZE);
     shared->base = (size_t) sbrk(0); // get the starting address
 #ifdef COLLECT_STATS
-    shared->total_alloc = PAGE_SIZE;
+    shared->total_alloc = MAX(sizeof(shared_data_t), PAGE_SIZE);
 #endif
     shared->next_page.next_pg_name = 0;
     shared->next_page.next_page = NULL;
@@ -162,6 +173,9 @@ static void grow(size_t aligned) {
   }
   // now map headers for my new (private) address region
   map_headers(base, index, blocks);
+#ifdef COLLECT_STATS
+  __sync_add_and_fetch(&shared->total_blocks, blocks);
+#endif
 }
 
 void * inc_heap(size_t s) {
@@ -316,11 +330,40 @@ void * borealloc(void * p, size_t size) {
   }
 }
 
+int unlink_cb(const char *fpath, const struct stat *sb, int typeflag)
+{
+    int rv = remove(fpath);
+
+    if (rv)
+        bomalloc_perror(fpath);
+
+    return rv;
+}
+
 void bomalloc_teardown() {
-  char path[2048]; // more than enough
+  char path[2048];
+  int written;
+  bool no_errors = true;
   // ensure the directory is present
-  snprintf(&path[0], sizeof(path), "rm -rf /tmp/bop/%d", getuniqueid());
-  if (system(&path[0]) != 0) {
-    perror("Unable to destroy tmp directory!");
+  for (int i = 1; i <= shared->next_name; i++) {
+    written = snprintf(&path[0], sizeof(path), "%s%d/%d", "/tmp/bop/", getuniqueid(), i);
+    if (written > sizeof(path) || written < 0) {
+      bomalloc_perror("Unable to write directory name for cleanup");
+      no_errors = false;
+      continue;
+    }
+    if (remove(path)) {
+      bomalloc_perror("Unable to remove file");
+      no_errors = false;
+    }
+  }
+  if (no_errors && shared->next_name != 0) {
+    written = snprintf(&path[0], sizeof(path), "%s%d/", "/tmp/bop/", getuniqueid());
+    if (written > sizeof(path) || written < 0) {
+      bomalloc_perror("Unable to write directory name for cleanup");
+    }
+    if (remove(path)) {
+      bomalloc_perror("Unable to remove directory");
+    }
   }
 }

@@ -14,6 +14,7 @@
 
 extern size_t my_growth;
 extern shared_data_t * shared;
+extern header_page_t * seq_headers_last;
 
 void beginspec() {
   assert(speculating()); // TODO -- probably special case this function
@@ -33,7 +34,13 @@ void endspec(bool ppr_won) {
   free_delayed();
   if (ppr_won) {
     promote_list();
+    // Fix up the header lists
+    if (seq_headers_last != NULL) {
+      seq_headers_last->next_header = (volatile struct header_page_t *) shared->header_pg;
+      shared->header_pg = NULL;
+    }
   }
+  // Note: pages are auto unmapped by the kernel on failure
 }
 
 static inline void set_large_perm(int flags) {
