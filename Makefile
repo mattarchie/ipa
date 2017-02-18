@@ -4,7 +4,7 @@ endif
 
 INCFLAGS = -I./ -I./bomalloc
 DEFS = -DCOLLECT_STATS -DBOMALLOC_SYSTEM_ALLOC -DNO_HOOK -DDEBUG -DSUPPORT_THREADS
-OPT_FLAGS = -O3 -fno-strict-aliasing -fno-strict-overflow -march=native
+OPT_FLAGS = -O3 -march=native
 DEBUG_FLAGS = -ggdb3 -g3
 CFLAGS = $(OPT_FLAGS) $(DEBUG_FLAGS) -fPIC -Wall -Wno-unused-function -Wno-deprecated-declarations $(INCFLAGS) $(DEFS)
 TEST_SOURCE = $(wildcard tests/*.c) $(wildcard tests/parallel/*.c)
@@ -39,11 +39,11 @@ tests/parallel/stack_%: tests/parallel/stack_%.c
 # stack tests doesn't depend on the whole system -- special case
 tests/stack_%: tests/stack_%.c
 	@echo "Linking $@"
-	@$(CC) $(CFLAGS) $? -o $@ $(LDFLAGS)
+	@$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
-tests/%: tests/%.o $(OBJECTS)
+tests/%: tests/%.o $(LIBRARY)
 	@echo "Linking $@"
-	@$(CC) -rdynamic $(CFLAGS) $< $(OBJECTS) -o $@ $(LDFLAGS)
+	@$(CC) -rdynamic $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
 %.o: %.c
 	@echo "Compiling $@"
