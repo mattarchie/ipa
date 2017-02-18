@@ -45,6 +45,7 @@ void print_bomalloc_stats() {
   printf("allocations: %u\n", snapshot.allocations);
   printf("frees: %u\n", snapshot.frees);
   printf("sbrks: %u\n", snapshot.sbrks);
+  printf("blocks: %u\n", snapshot.total_blocks);
   printf("huge allocations: %u\n", snapshot.huge_allocations);
   printf("header pages: %u\n", snapshot.header_pages);
   printf("headers / page: %lu\n", HEADERS_PER_PAGE);

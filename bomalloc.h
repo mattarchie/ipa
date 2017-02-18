@@ -151,6 +151,7 @@ typedef struct {
   volatile unsigned allocs_per_class[NUM_CLASSES];
   volatile line_int_t huge_allocations;
   volatile line_int_t header_pages;
+  volatile line_int_t total_blocks; // this includes spec and non spec
   volatile size_t total_alloc; // total space allocated from the system (heap + mmap)
   volatile uint64_t time_malloc;
 #endif
