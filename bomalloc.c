@@ -147,11 +147,15 @@ static void grow(size_t aligned) {
   assert(size > 0);
   size_t blocks = MIN(HEADERS_PER_PAGE, MAX(1024 / size, 15));
 
-  size_t my_region_size = size * blocks;
+  const size_t my_region_size = size * blocks;
   if (speculating()) {
     // first allocate the extra space that's needed. Don't record the to allocation
-    inc_heap(__sync_add_and_fetch(&shared->spec_growth, my_region_size) - my_growth - my_region_size);
-    __sync_add_and_fetch(&my_growth, size * blocks);
+    const size_t total = __sync_add_and_fetch(&shared->spec_growth, my_region_size);
+    // Below, we grow to match the agreed global speculative heap
+    // This is done to re-use code for the normal nonspec path
+    // which will grow the heap by the amount we need, eg. my_region_size
+    inc_heap(total - my_growth - my_region_size);
+    __sync_add_and_fetch(&my_growth, my_region_size);
   }
   // Grow the heap by the space needed for my allocations
   char * base = inc_heap(my_region_size);
