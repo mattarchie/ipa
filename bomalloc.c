@@ -33,10 +33,6 @@ bool out_of_range(void * payload) {
   return payload < (void*) shared->base || payload >= sbrk(0);
 }
 
-static header_t * lookup_header(void * user_payload) {
-  return out_of_range(user_payload) ? NULL : getblock(user_payload)->header;
-}
-
 static inline volatile header_t * alloc_pop(size_t size) {
   size_t index = SIZE_TO_CLASS(size);
   assert(index >= 0 && index < NUM_CLASSES);
@@ -56,15 +52,6 @@ static inline volatile header_t * alloc_pop(size_t size) {
 #else
    return seq_node_to_header(pop_ageless(&shared->seq_free[index]));
 #endif
-  }
-}
-
-static header_page_t * payload_to_header_page(void * payload) {
-  if (out_of_range(payload)) {
-    return NULL;
-  } else {
-    block_t * block = getblock(payload);
-    return  (header_page_t *) (((intptr_t) block) & ~(PAGE_SIZE - 1));
   }
 }
 

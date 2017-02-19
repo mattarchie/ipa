@@ -6,7 +6,7 @@ INCFLAGS = -I./ -I./bomalloc
 DEFS = -DCOLLECT_STATS -DBOMALLOC_SYSTEM_ALLOC -DNO_HOOK -DDEBUG -DSUPPORT_THREADS
 OPT_FLAGS = -O3 -march=native
 DEBUG_FLAGS = -ggdb3 -g3
-CFLAGS = $(OPT_FLAGS) $(DEBUG_FLAGS) -fPIC -Wall -Wno-unused-function -Wno-deprecated-declarations $(INCFLAGS) $(DEFS)
+CFLAGS = $(OPT_FLAGS) $(DEBUG_FLAGS) -fPIC -Wall -Wno-missing-braces  $(INCFLAGS) $(DEFS)
 TEST_SOURCE = $(wildcard tests/*.c) $(wildcard tests/parallel/*.c)
 SOURCE = $(wildcard *.c)
 ALL_SOURCE = $(TEST_SOURCE) $(SOURCE)

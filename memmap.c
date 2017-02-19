@@ -349,7 +349,9 @@ header_page_t * allocate_header_page() {
       } else {
         headers->next_header = (volatile struct header_page_t *) shared->header_pg;
       }
-    } while (!__sync_bool_compare_and_swap(&shared->header_pg, headers->next_header, (struct header_page_t *) headers));
+    } while (!__sync_bool_compare_and_swap(&shared->header_pg,
+                                    (header_page_t *) headers->next_header,
+                                    headers));
   } else {
 #ifdef SUPPORT_THREADS
     do {
@@ -358,13 +360,15 @@ header_page_t * allocate_header_page() {
       } else {
         headers->next_header = (volatile struct header_page_t *) seq_headers;
       }
-    } while (!__sync_bool_compare_and_swap(&seq_headers, headers->next_header, (struct header_page_t *) headers));
+    } while (!__sync_bool_compare_and_swap(&seq_headers,
+                                    (header_page_t *) headers->next_header,
+                                    headers));
 #else
     if (seq_headers == NULL) {
       seq_headers_last = seq_headers = headers;
     } else {
       headers->next_header = (volatile struct header_page_t *) seq_headers;
-    seq_headers = headers;
+      seq_headers = headers;
     }
 #endif
   }
@@ -390,7 +394,7 @@ huge_block_t * allocate_large(size_t size) {
   if (speculating()) {
     do {
       block->next_block = (volatile struct huge_block_t *) shared->large_block;
-    } while(!__sync_bool_compare_and_swap(&shared->large_block, block->next_block, block));
+    } while(!__sync_bool_compare_and_swap(&shared->large_block, (huge_block_t*) block->next_block, block));
   }
   if (block == (huge_block_t *) block->next_page.next_page) {
     abort();

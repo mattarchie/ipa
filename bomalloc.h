@@ -186,11 +186,11 @@ static inline huge_block_t * gethugeblock(void * user_payload) {
   return (huge_block_t *) (((char*) user_payload) - sizeof(huge_block_t));
 }
 
-static void * getpayload(volatile block_t * block) {
+static inline void * getpayload(volatile block_t * block) {
   return (void *) (((char*) block) + sizeof(block_t));
 }
 
-static void * gethugepayload(volatile huge_block_t * block) {
+static inline void * gethugepayload(volatile huge_block_t * block) {
   return (void *) (((char*) block) + sizeof(huge_block_t));
 }
 
