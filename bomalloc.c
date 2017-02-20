@@ -18,6 +18,7 @@
 
 
 shared_data_t * shared;
+volatile header_page_t * first_full = NULL;
 size_t my_growth;
 
 extern header_page_t * seq_headers;
@@ -76,10 +77,11 @@ static void map_headers(char * begin, size_t index, size_t num_blocks) {
   assert(block_size == ALIGN(block_size));
   volatile header_t * header = NULL;
   const bool am_spec = speculating();
-  volatile header_page_t * start_page = am_spec ? shared->header_pg : seq_headers;
+
   for (i = 0; i < num_blocks; i++) {
-    while(header_index >= (HEADERS_PER_PAGE - 1) || header_index == -1) {
-      for (page = start_page; page != NULL; page = (volatile header_page_t *) page->next_header) {
+    volatile header_page_t * start_page = am_spec ? shared->header_pg : seq_headers;
+    while (header_index >= (HEADERS_PER_PAGE - 1) || header_index == -1) {
+      for (page = start_page; page != NULL && page != first_full; page = (volatile header_page_t *) page->next_header) {
         while (am_spec && !is_mapped((void *) page)) {
           map_missing_pages();
         }
@@ -90,9 +92,10 @@ static void map_headers(char * begin, size_t index, size_t num_blocks) {
           }
         }
       }
-      if (page == NULL) {
+      if (page == NULL || page == first_full) {
         page = allocate_header_page();
         header_index = 0;
+        first_full = start_page;
         goto found;
       }
     }
