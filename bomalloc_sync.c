@@ -14,6 +14,7 @@
 
 extern size_t my_growth;
 extern shared_data_t * shared;
+extern header_page_t * seq_headers;
 extern header_page_t * seq_headers_last;
 
 void beginspec() {
@@ -74,7 +75,7 @@ void synch_lists() {
   }
 
   // Set the stack elements
-  for (page = shared->header_pg; page != NULL; page = (header_page_t *) page->next_header) {
+  for (page = seq_headers; page != NULL; page = (header_page_t *) page->next_header) {
     for (i = 0; i < MIN(HEADERS_PER_PAGE, page->next_free); i++) {
       header = &page->headers[i];
       if (!seq_alloced(header) && header->seq_next.next != NULL) {
