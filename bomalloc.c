@@ -9,6 +9,7 @@
 #include <error.h>
 #include <ftw.h>
 #include <unistd.h>
+#include <signal.h>
 
 #include "bomalloc.h"
 #include "memmap.h"
@@ -34,6 +35,10 @@ bool out_of_range(void * payload) {
   return payload < (void*) shared->base || payload >= sbrk(0);
 }
 
+void map_all_segv(int signo) {
+  map_missing_pages();
+}
+
 static inline volatile header_t * alloc_pop(size_t size) {
   size_t index = SIZE_TO_CLASS(size);
   assert(index >= 0 && index < NUM_CLASSES);
@@ -41,7 +46,11 @@ static inline volatile header_t * alloc_pop(size_t size) {
     if (!empty(&delayed_frees_reclaimable[index])) {
       return spec_node_to_header(pop_ageless(&delayed_frees_reclaimable[index]));
     } else {
-      return spec_node_to_header(pop(&shared->spec_free[index]));
+      typedef void (*sighandler_t)(int);
+      sighandler_t old = signal(SIGSEGV, map_all_segv);
+      volatile header_t * h = spec_node_to_header(pop(&shared->spec_free[index]));
+      signal(SIGSEGV, old);
+      return h;
     }
   } else {
     // Because pages are never backed to disk and the shared
@@ -72,7 +81,7 @@ static void map_headers(char * begin, size_t index, size_t num_blocks) {
   size_t block_size = CLASS_TO_SIZE(index);
   volatile bomalloc_stack_t * spec_stack = &shared->spec_free[index];
   volatile bomalloc_stack_t * seq_stack = &shared->seq_free[index];
-  bomalloc_stack_t * local_stack = &delayed_frees_reclaimable[index];
+  // bomalloc_stack_t * local_stack = &delayed_frees_reclaimable[index];
   volatile block_t * block;
   assert(block_size == ALIGN(block_size));
   volatile header_t * header = NULL;
@@ -116,11 +125,11 @@ static void map_headers(char * begin, size_t index, size_t num_blocks) {
     assert(payload(header) == getpayload(block));
 
     if (am_spec) {
-      push_ageless(local_stack, (node_t *) &header->spec_next);
+      push(spec_stack, (node_t *) &header->spec_next);
+      // push_ageless(local_stack, (node_t *) &header->spec_next);
     } else {
       __sync_synchronize(); // mem fence
       push(seq_stack, (node_t * ) &header->seq_next);
-      push(spec_stack, (node_t * ) &header->spec_next);
     }
     // get the i-block
     header_index = -1;
