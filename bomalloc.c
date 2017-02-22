@@ -35,8 +35,10 @@ bool out_of_range(void * payload) {
   return payload < (void*) shared->base || payload >= sbrk(0);
 }
 
+static bool fault_on_pop = false;
 void map_all_segv(int signo) {
   map_missing_pages();
+  fault_on_pop = true;
 }
 
 static inline volatile header_t * alloc_pop(size_t size) {
@@ -47,8 +49,12 @@ static inline volatile header_t * alloc_pop(size_t size) {
       return spec_node_to_header(pop_ageless(&delayed_frees_reclaimable[index]));
     } else {
       typedef void (*sighandler_t)(int);
+      volatile header_t * h = NULL;
       sighandler_t old = signal(SIGSEGV, map_all_segv);
-      volatile header_t * h = spec_node_to_header(pop(&shared->spec_free[index]));
+      do {
+        fault_on_pop = false;
+        h = spec_node_to_header(pop(&shared->spec_free[index]));
+      } while(h == NULL && fault_on_pop);
       signal(SIGSEGV, old);
       return h;
     }
@@ -222,11 +228,8 @@ void * bomalloc(size_t size) {
     }
     return gethugepayload(block);
   } else {
-    alloc:
-    header = alloc_pop(aligned);
-    if (! header) {
+    for (header = alloc_pop(aligned); header == NULL; header = alloc_pop(aligned)) {
       grow(aligned);
-      goto alloc;
     }
     assert(payload(header) != NULL);
     // Ensure that the payload is in my allocated memory
