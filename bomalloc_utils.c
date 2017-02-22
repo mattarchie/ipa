@@ -69,3 +69,33 @@ void print_bomalloc_stats() {
   printf("BOMALLOC not configured to collect statistics\n");
 #endif
 }
+
+extern int getuniqueid(void);
+
+void bomalloc_teardown() {
+  char path[2048];
+  int written;
+  bool no_errors = true;
+  // ensure the directory is present
+  for (int i = 1; i <= shared->next_name; i++) {
+    written = snprintf(&path[0], sizeof(path), "%s%d/%d", "/tmp/bop/", getuniqueid(), i);
+    if (written > sizeof(path) || written < 0) {
+      bomalloc_perror("Unable to write directory name for cleanup");
+      no_errors = false;
+      continue;
+    }
+    if (remove(path)) {
+      bomalloc_perror("Unable to remove file");
+      no_errors = false;
+    }
+  }
+  if (no_errors && shared->next_name != 0) {
+    written = snprintf(&path[0], sizeof(path), "%s%d/", "/tmp/bop/", getuniqueid());
+    if (written > sizeof(path) || written < 0) {
+      bomalloc_perror("Unable to write directory name for cleanup");
+    }
+    if (remove(path)) {
+      bomalloc_perror("Unable to remove directory");
+    }
+  }
+}
