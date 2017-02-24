@@ -9,6 +9,7 @@
 #include <error.h>
 #include <ftw.h>
 #include <unistd.h>
+#include <signal.h>
 
 #include "bomalloc.h"
 #include "memmap.h"
@@ -34,6 +35,12 @@ bool out_of_range(void * payload) {
   return payload < (void*) shared->base || payload >= sbrk(0);
 }
 
+static bool fault_on_pop = false;
+void map_all_segv(int signo) {
+  map_missing_pages();
+  fault_on_pop = true;
+}
+
 static inline volatile header_t * alloc_pop(size_t size) {
   size_t index = SIZE_TO_CLASS(size);
   assert(index >= 0 && index < NUM_CLASSES);
@@ -41,7 +48,15 @@ static inline volatile header_t * alloc_pop(size_t size) {
     if (!empty(&delayed_frees_reclaimable[index])) {
       return spec_node_to_header(pop_ageless(&delayed_frees_reclaimable[index]));
     } else {
-      return spec_node_to_header(pop(&shared->spec_free[index]));
+      typedef void (*sighandler_t)(int);
+      volatile header_t * h = NULL;
+      sighandler_t old = signal(SIGSEGV, map_all_segv);
+      do {
+        fault_on_pop = false;
+        h = spec_node_to_header(pop(&shared->spec_free[index]));
+      } while(h == NULL && fault_on_pop);
+      signal(SIGSEGV, old);
+      return h;
     }
   } else {
     // Because pages are never backed to disk and the shared
@@ -72,7 +87,7 @@ static void map_headers(char * begin, size_t index, size_t num_blocks) {
   size_t block_size = CLASS_TO_SIZE(index);
   volatile bomalloc_stack_t * spec_stack = &shared->spec_free[index];
   volatile bomalloc_stack_t * seq_stack = &shared->seq_free[index];
-  bomalloc_stack_t * local_stack = &delayed_frees_reclaimable[index];
+  // bomalloc_stack_t * local_stack = &delayed_frees_reclaimable[index];
   volatile block_t * block;
   assert(block_size == ALIGN(block_size));
   volatile header_t * header = NULL;
@@ -116,11 +131,11 @@ static void map_headers(char * begin, size_t index, size_t num_blocks) {
     assert(payload(header) == getpayload(block));
 
     if (am_spec) {
-      push_ageless(local_stack, (node_t *) &header->spec_next);
+      push(spec_stack, (node_t *) &header->spec_next);
+      // push_ageless(local_stack, (node_t *) &header->spec_next);
     } else {
       __sync_synchronize(); // mem fence
       push(seq_stack, (node_t * ) &header->seq_next);
-      push(spec_stack, (node_t * ) &header->spec_next);
     }
     // get the i-block
     header_index = -1;
@@ -213,11 +228,8 @@ void * bomalloc(size_t size) {
     }
     return gethugepayload(block);
   } else {
-    alloc:
-    header = alloc_pop(aligned);
-    if (! header) {
+    for (header = alloc_pop(aligned); header == NULL; header = alloc_pop(aligned)) {
       grow(aligned);
-      goto alloc;
     }
     assert(payload(header) != NULL);
     // Ensure that the payload is in my allocated memory
@@ -321,43 +333,5 @@ void * borealloc(void * p, size_t size) {
     memcpy(new_payload, p, original_size);
     bofree(p);
     return new_payload;
-  }
-}
-
-int unlink_cb(const char *fpath, const struct stat *sb, int typeflag)
-{
-    int rv = remove(fpath);
-
-    if (rv)
-        bomalloc_perror(fpath);
-
-    return rv;
-}
-
-void bomalloc_teardown() {
-  char path[2048];
-  int written;
-  bool no_errors = true;
-  // ensure the directory is present
-  for (int i = 1; i <= shared->next_name; i++) {
-    written = snprintf(&path[0], sizeof(path), "%s%d/%d", "/tmp/bop/", getuniqueid(), i);
-    if (written > sizeof(path) || written < 0) {
-      bomalloc_perror("Unable to write directory name for cleanup");
-      no_errors = false;
-      continue;
-    }
-    if (remove(path)) {
-      bomalloc_perror("Unable to remove file");
-      no_errors = false;
-    }
-  }
-  if (no_errors && shared->next_name != 0) {
-    written = snprintf(&path[0], sizeof(path), "%s%d/", "/tmp/bop/", getuniqueid());
-    if (written > sizeof(path) || written < 0) {
-      bomalloc_perror("Unable to write directory name for cleanup");
-    }
-    if (remove(path)) {
-      bomalloc_perror("Unable to remove directory");
-    }
   }
 }
