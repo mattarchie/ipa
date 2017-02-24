@@ -154,6 +154,7 @@ typedef struct {
   volatile line_int_t total_blocks; // this includes spec and non spec
   volatile size_t total_alloc; // total space allocated from the system (heap + mmap)
   volatile uint64_t time_malloc;
+  volatile line_int_t num_unmaps;
 #endif
   volatile bomalloc_stack_t seq_free[NUM_CLASSES]; // sequential free list
   volatile bomalloc_stack_t spec_free[NUM_CLASSES]; // speculative free list

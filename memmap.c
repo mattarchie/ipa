@@ -265,7 +265,7 @@ volatile bomalloc_page_t * map_missing_pages() {
  */
 static inline bomalloc_page_t * allocate_bomalloc_page(int file_no, size_t minsize, int flags) {
   bomalloc_page_t * allocation = NULL;
-  bomalloc_page_t alloc = {0}, expected = {0};
+  bomalloc_page_t alloc = {0};
   // Reserve the resources in shared for this allocation
   int file_descriptor;
   size_t allocation_size = MAX(minsize, PAGE_SIZE);
@@ -279,7 +279,6 @@ static inline bomalloc_page_t * allocate_bomalloc_page(int file_no, size_t minsi
     flags |= MAP_SHARED;
   }
   volatile bomalloc_page_t * last_page;
-  volatile int unmaps = 0;
 
   if (!speculating()) {
     assert(file_no == -1);
@@ -310,14 +309,16 @@ static inline bomalloc_page_t * allocate_bomalloc_page(int file_no, size_t minsi
       if (last_page == (volatile bomalloc_page_t *) last_page->next_page) {
         abort();
       }
-      if (__sync_bool_compare_and_swap(&last_page->combined, expected.combined, alloc.combined)) {
+      if (__sync_bool_compare_and_swap(&last_page->combined, 0, alloc.combined)) {
         assert( (bomalloc_page_t *) last_page->next_page == allocation);
         assert( (bomalloc_page_t *) allocation->next_page != last_page);
         assert( (bomalloc_page_t *) allocation->next_page != allocation);
         break;
       } else {
         munmap(allocation, allocation_size);
-        unmaps++;
+#ifdef COLLECT_STATS
+        __sync_add_and_fetch(&shared->num_unmaps, 1);
+#endif
       }
     }
     if (file_descriptor != -1) {

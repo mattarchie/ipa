@@ -8,8 +8,8 @@
 #include "bomalloc.h"
 #include "bomalloc_utils.h"
 
-#define NUM_ROUNDS 10
-#define NUM_CHILDREN 2
+#define NUM_ROUNDS 2000
+#define NUM_CHILDREN 4
 #define PER_EACH (NUM_ROUNDS / NUM_CHILDREN)
 
 
@@ -39,9 +39,9 @@ void __attribute__((noreturn)) child(int id)  {
   while (shared->dummy == 0) {
     ;
   }
-  for (int rnd = PER_EACH * id; rnd < PER_EACH * (id + 1); rnd++) {
+  for (size_t  rnd = PER_EACH * id; rnd < PER_EACH * (id + 1); rnd++) {
     int * payload = bomalloc(alloc_size);
-    printf("rnd %d Allocated %p\n", rnd, payload);
+    printf("rnd %lu Allocated %p\n", rnd, payload);
     assert(bomalloc_usable_space(payload) >= alloc_size);
     *payload = 0xdeadbeef;
   }

@@ -48,6 +48,7 @@ void print_bomalloc_stats() {
   printf("blocks: %u\n", snapshot.total_blocks);
   printf("huge allocations: %u\n", snapshot.huge_allocations);
   printf("header pages: %u\n", snapshot.header_pages);
+  printf("Unmappings: %u\n",snapshot.num_unmaps);
   printf("headers / page: %lu\n", HEADERS_PER_PAGE);
   printf("Time spent allocating: %'lu ns (%'.5lf s)\n", snapshot.time_malloc, TIME_TO_SEC(snapshot.time_malloc));
   double average = ((double) snapshot.time_malloc) / snapshot.allocations;
