@@ -43,12 +43,12 @@ static const size_t class_sizes[] = {
 #define PAGE_SIZE 4096 //default Linux
 
 
-static inline size_t __size_to_class(unsigned x) {
+static inline size_t __size_to_class(size_t x) {
   assert(x >= 0 && x < NUM_CLASSES);
   return class_sizes[x];
 }
 
-static inline const size_t class_for_size(unsigned x) {
+static inline const size_t class_for_size(size_t x) {
   size_t s;
   for (s = 0; s < NUM_CLASSES; s++) {
     if (class_sizes[s] >= x) {

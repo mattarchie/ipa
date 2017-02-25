@@ -215,8 +215,6 @@ static void map_now (volatile bomalloc_page_t * last_page) {
 static inline bool full_map_check(volatile bomalloc_page_t * prev) {
   if (prev->next_pg_name == -1) {
     return true;
-  } else if (is_mapped((void *) prev->next_page)) {
-    return true;
   } else {
     return is_mapped_segv_check(prev);
   }
