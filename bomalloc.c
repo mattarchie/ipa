@@ -37,7 +37,6 @@ bool out_of_range(void * payload) {
 
 static bool fault_on_pop = false;
 void map_all_segv(int signo) {
-  map_missing_pages();
   fault_on_pop = true;
 }
 
@@ -51,8 +50,11 @@ static inline volatile header_t * alloc_pop(size_t size) {
       typedef void (*sighandler_t)(int);
       volatile header_t * h = NULL;
       sighandler_t old = signal(SIGSEGV, map_all_segv);
+      fault_on_pop = false;
       do {
-        fault_on_pop = false;
+        if (fault_on_pop) {
+          map_missing_pages();
+        }
         h = spec_node_to_header(pop(&shared->spec_free[index]));
       } while(h == NULL && fault_on_pop);
       signal(SIGSEGV, old);
@@ -192,7 +194,12 @@ void * inc_heap(size_t s) {
   __sync_add_and_fetch(&shared->sbrks, 1);
   __sync_add_and_fetch(&shared->total_alloc, s);
 #endif
-  return sbrk(s);
+  void * x = sbrk(s);
+  if (x == (void *) -1) {
+    bomalloc_perror("Unable to extend data segment");
+    abort();
+  }
+  return x;
 }
 
 size_t stack_for_size(size_t min_size) {
@@ -233,12 +240,15 @@ void * bomalloc(size_t size) {
     }
     assert(payload(header) != NULL);
     // Ensure that the payload is in my allocated memory
-    while (out_of_range(payload(header))) {
+    if (out_of_range(payload(header))) {
       // heap needs to extend to header->payload + header->size
-      size_t growth = shared->spec_growth - my_growth;
+      void * pl = payload(header);
+      block_t * block = getblock(pl);
+      size_t growth = ((intptr_t) sbrk(0)) - ((intptr_t) block) + header->size + 1 - my_growth; //shared->spec_growth - my_growth;
       my_growth += growth;
       inc_heap(growth);
-      getblock(payload(header))->header = (header_t *) header;
+      block->header = (header_t *) header;
+      // getblock(payload(header))->header = (header_t *) header;
     }
     if (getblock(payload(header))->header != header) {
       getblock(payload(header))->header = (header_t *) header;
