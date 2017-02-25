@@ -28,7 +28,7 @@ static bomalloc_stack_t delayed_frees_unclaimable[NUM_CLASSES] = {0};
 static bomalloc_stack_t delayed_frees_reclaimable[NUM_CLASSES] = {0};
 
 //prototypes
-void * inc_heap(size_t);
+void * inc_heap(intptr_t);
 void free_delayed(void);
 
 bool out_of_range(void * payload) {
@@ -38,6 +38,7 @@ bool out_of_range(void * payload) {
 static bool fault_on_pop = false;
 void map_all_segv(int signo) {
   fault_on_pop = true;
+  map_missing_pages_handler();
 }
 
 static inline volatile header_t * alloc_pop(size_t size) {
@@ -50,11 +51,8 @@ static inline volatile header_t * alloc_pop(size_t size) {
       typedef void (*sighandler_t)(int);
       volatile header_t * h = NULL;
       sighandler_t old = signal(SIGSEGV, map_all_segv);
-      fault_on_pop = false;
       do {
-        if (fault_on_pop) {
-          map_missing_pages();
-        }
+        fault_on_pop = false;
         h = spec_node_to_header(pop(&shared->spec_free[index]));
       } while(h == NULL && fault_on_pop);
       signal(SIGSEGV, old);
@@ -87,9 +85,9 @@ static void map_headers(char * begin, size_t index, size_t num_blocks) {
   size_t i, header_index = -1;
   volatile header_page_t * page;
   size_t block_size = CLASS_TO_SIZE(index);
-  volatile bomalloc_stack_t * spec_stack = &shared->spec_free[index];
   volatile bomalloc_stack_t * seq_stack = &shared->seq_free[index];
-  // bomalloc_stack_t * local_stack = &delayed_frees_reclaimable[index];
+  // volatile bomalloc_stack_t * spec_stack = &shared->spec_free[index];
+  bomalloc_stack_t * local_stack = &delayed_frees_reclaimable[index];
   volatile block_t * block;
   assert(block_size == ALIGN(block_size));
   volatile header_t * header = NULL;
@@ -133,7 +131,7 @@ static void map_headers(char * begin, size_t index, size_t num_blocks) {
     assert(payload(header) == getpayload(block));
 
     if (am_spec) {
-      push(spec_stack, (node_t *) &header->spec_next);
+      push_ageless(local_stack, (node_t *) &header->spec_next);
       // push_ageless(local_stack, (node_t *) &header->spec_next);
     } else {
       __sync_synchronize(); // mem fence
@@ -167,10 +165,10 @@ static void grow(size_t aligned) {
   assert(size > 0);
   size_t blocks = MIN(HEADERS_PER_PAGE, MAX(1024 / size, 15));
 
-  const size_t my_region_size = size * blocks;
+  const intptr_t my_region_size = size * blocks;
   if (speculating()) {
     // first allocate the extra space that's needed. Don't record the to allocation
-    const size_t total = __sync_add_and_fetch(&shared->spec_growth, my_region_size);
+    const intptr_t total = __sync_add_and_fetch(&shared->spec_growth, my_region_size);
     // Below, we grow to match the agreed global speculative heap
     // This is done to re-use code for the normal nonspec path
     // which will grow the heap by the amount we need, eg. my_region_size
@@ -189,7 +187,7 @@ static void grow(size_t aligned) {
 #endif
 }
 
-void * inc_heap(size_t s) {
+void * inc_heap(intptr_t s) {
 #ifdef COLLECT_STATS
   __sync_add_and_fetch(&shared->sbrks, 1);
   __sync_add_and_fetch(&shared->total_alloc, s);
@@ -244,7 +242,8 @@ void * bomalloc(size_t size) {
       // heap needs to extend to header->payload + header->size
       void * pl = payload(header);
       block_t * block = getblock(pl);
-      size_t growth = ((intptr_t) sbrk(0)) - ((intptr_t) block) + header->size + 1 - my_growth; //shared->spec_growth - my_growth;
+      void * end_block = (void *) ((intptr_t) block) + header->size;
+      intptr_t growth = ((intptr_t) end_block) - ((intptr_t) sbrk(0));
       my_growth += growth;
       inc_heap(growth);
       block->header = (header_t *) header;

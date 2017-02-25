@@ -8,7 +8,7 @@
 #include "bomalloc.h"
 #include "bomalloc_utils.h"
 
-#define NUM_ROUNDS 2000
+#define NUM_ROUNDS 1000
 #define NUM_CHILDREN 4
 #define PER_EACH (NUM_ROUNDS / NUM_CHILDREN)
 
@@ -35,7 +35,7 @@ int getuniqueid() {
 
 void __attribute__((noreturn)) child(int id)  {
   spec = true;
-  size_t alloc_size = MAX_SIZE + sizeof(block_t) + 1;
+  size_t alloc_size = sizeof(int); //MAX_SIZE + sizeof(block_t) + 1;
   while (shared->dummy == 0) {
     ;
   }

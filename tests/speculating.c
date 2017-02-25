@@ -2,29 +2,22 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <errno.h>
 #include "bomalloc.h"
-#include "teardown.h"
+#include "bomalloc_utils.h"
 
-#if __WORDSIZE == 64
-#define NUM_ROUNDS 200
-#else
-#define NUM_ROUNDS 5
-#endif
+#define NUM_ROUNDS 100
+#define NUM_CHILDREN 4
+#define PER_EACH (NUM_ROUNDS / NUM_CHILDREN)
+
 
 // Random number generation based off of http://www.azillionmonkeys.com/qed/random.html
 #define RS_SCALE (1.0 / (1.0 + RAND_MAX))
 
-size_t random_class () {
-    double d;
-    do {
-       d = (((rand () * RS_SCALE) + rand ()) * RS_SCALE + rand ()) * RS_SCALE;
-    } while (d >= 1); /* Round off */
-    return d * NUM_CLASSES;
-}
 
-size_t uniform_size_class() {
-  return ALIGN(CLASS_TO_SIZE(random_class()) - sizeof(block_t));
-}
+_Static_assert(NUM_ROUNDS % NUM_CHILDREN == 0, "Rounds must be divisible by children");
 
 volatile bool spec = false;
 
@@ -40,34 +33,51 @@ int getuniqueid() {
   return (int) getpgid(getpid());
 }
 
-int main() {
-  int * sequential = bomalloc(sizeof(int));
-  int * ptrs[NUM_ROUNDS] = {NULL};
-  ptrs[0] = sequential;
+void __attribute__((noreturn)) child(int id)  {
   spec = true;
-  beginspec();
-
-
-  int rnd, check;
-  size_t alloc_size;
-
-  srand(0);
-
-  for (rnd = 1; rnd < NUM_ROUNDS; rnd++) {
-    alloc_size = uniform_size_class();
+  size_t alloc_size = sizeof(int); //MAX_SIZE + sizeof(block_t) + 1;
+  while (shared->dummy == 0) {
+    ;
+  }
+  for (size_t  rnd = PER_EACH * id; rnd < PER_EACH * (id + 1); rnd++) {
     int * payload = bomalloc(alloc_size);
-    assert(bomalloc_usable_space(payload) >= alloc_size);
-    ptrs[rnd] = payload;
-    for (check = 0; check < rnd; check++) {
-      if (ptrs[check] == payload) {
-        fprintf(stderr, "Duplicate allocation found indexes %d %d\n", rnd, check);
-        exit(-1);
-      }
+    printf("rnd %lu Allocated %p\n", rnd, payload);
+  }
+  printf("Child %d exits\n", id);
+  exit(0);
+}
+
+pid_t parent;
+
+int main() {
+  srand(0);
+  spec = true;
+  pid_t children[NUM_CHILDREN];
+  parent = getpid();
+  beginspec();
+  for (int i = 0; i < NUM_CHILDREN; i++) {
+    pid_t pid = fork();
+    if (pid == 0) {
+      child(i);
+    } else if (pid == -1) {
+      perror("Unable to fork process");
+      exit(-1);
     }
-    *payload = 0xdeadbeef;
+    children[i] = pid;
+  }
+  shared->dummy = 1;
+  int status;
+  for (int i = 0; i < NUM_CHILDREN; i++) {
+    if (waitpid(children[i], &status, 0) == -1) {
+      perror("Unable to wait for child");
+      exit(-1);
+    }
+    assert(WIFEXITED(status));
+    assert(WEXITSTATUS(status) == 0);
   }
   endspec(true);
   spec = false;
-  printf("Small spec allocation test passed! No duplicate allocations detected\n");
+  printf("Large spec allocation test passed!\n");
   print_bomalloc_stats();
+  bomalloc_teardown();
 }

@@ -13,3 +13,4 @@ fork_alloc
 all_tests
 large_allocations
 performance
+stress

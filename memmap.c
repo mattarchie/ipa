@@ -212,17 +212,19 @@ static void map_now (volatile bomalloc_page_t * last_page) {
     }
   }
 }
-static inline bool full_map_check(volatile bomalloc_page_t * prev) {
+static inline bool full_map_check(bool faulting, volatile bomalloc_page_t * prev) {
   if (prev->next_pg_name == -1) {
     return true;
-  } else {
+  } else if (!faulting) {
     return is_mapped_segv_check(prev);
+  } else {
+    return false;
   }
 }
 
 // Map all missing pages
 // Returns the last non-null page (eg. the one with the next page filed set to null)
-volatile bomalloc_page_t * map_missing_pages() {
+static inline volatile bomalloc_page_t * map_missing_pages_safe(bool faulting) {
   static volatile bomalloc_page_t * cache = NULL;
   volatile bomalloc_page_t * start = cache == NULL ? &shared->next_page : cache;
   volatile bomalloc_page_t * last_page = start;
@@ -230,14 +232,14 @@ volatile bomalloc_page_t * map_missing_pages() {
   // These are for debugging, volatile so they can't be removed by compiler
   volatile int rounds = 0, maps = 0;
   if (start->next_page != NULL) {
-    if (!full_map_check(start)) {
+    if (!full_map_check(faulting, start)) {
       maps++;
       map_now(start);
       assert(is_mapped((void *)  start->next_page));
     }
     for (last_page = start; last_page->next_page != NULL; prev = last_page,  last_page = (volatile bomalloc_page_t *) last_page->next_page) {
       rounds++;
-      if (!full_map_check(last_page)) {
+      if (!full_map_check(faulting, last_page)) {
         maps++;
         map_now(last_page);
       }
@@ -250,6 +252,14 @@ volatile bomalloc_page_t * map_missing_pages() {
     }
   }
   return last_page;
+}
+
+volatile bomalloc_page_t * map_missing_pages() {
+  return map_missing_pages_safe(false);
+}
+
+void map_missing_pages_handler() {
+  map_missing_pages_safe(true);
 }
 
 /**
