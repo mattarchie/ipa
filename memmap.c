@@ -271,8 +271,7 @@ static inline bomalloc_page_t * allocate_bomalloc_page(int file_no, size_t minsi
   size_t allocation_size = MAX(minsize, PAGE_SIZE);
   assert(allocation_size % PAGE_SIZE == 0);
   assert(shared != NULL);
-  if (!speculating()) {
-    assert(file_no == -1);
+  if (file_no == -1) {
     flags |= MAP_ANONYMOUS;
   } else {
     flags &= ~MAP_PRIVATE;
@@ -280,8 +279,7 @@ static inline bomalloc_page_t * allocate_bomalloc_page(int file_no, size_t minsi
   }
   volatile bomalloc_page_t * last_page;
 
-  if (!speculating()) {
-    assert(file_no == -1);
+  if (file_no == -1) {
     allocation = mmap(NULL, allocation_size, PROT_READ | PROT_WRITE, flags, -1, 0);
   } else {
     assert(file_no != -1);
@@ -336,7 +334,7 @@ static inline bomalloc_page_t * allocate_bomalloc_page(int file_no, size_t minsi
 
 header_page_t * allocate_header_page() {
   // headers are always shared -- always increment name
-  const int file_no = !speculating() ? -1 : __sync_add_and_fetch(&shared->next_name, 1);
+  const int file_no = __sync_add_and_fetch(&shared->next_name, 1);
   header_page_t * headers = (header_page_t *) allocate_bomalloc_page(file_no, MAX(PAGE_SIZE, sizeof(header_page_t)), MAP_SHARED);
 
   if (headers == (header_page_t *) -1) {
