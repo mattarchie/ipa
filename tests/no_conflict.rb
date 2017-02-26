@@ -4,8 +4,10 @@ def no_conflict(lines)
     $~[:address] if $~
   }.select{|x| ! x.nil?}
   if addr.uniq.length == addr.length
+    puts "success"
     exit(0)
   else
+    puts "failure"  
     exit(-1)
   end
 end
