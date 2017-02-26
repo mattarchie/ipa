@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <string.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include <unistd.h>
@@ -8,16 +9,14 @@
 #include "bomalloc.h"
 #include "bomalloc_utils.h"
 
-#define NUM_ROUNDS 100
-#define NUM_CHILDREN 4
-#define PER_EACH (NUM_ROUNDS / NUM_CHILDREN)
+int num_rounds = 200;
+int num_children = 4;
 
+#define PER_EACH (num_rounds / num_children)
 
 // Random number generation based off of http://www.azillionmonkeys.com/qed/random.html
 #define RS_SCALE (1.0 / (1.0 + RAND_MAX))
 
-
-_Static_assert(NUM_ROUNDS % NUM_CHILDREN == 0, "Rounds must be divisible by children");
 
 volatile bool spec = false;
 
@@ -49,13 +48,21 @@ void __attribute__((noreturn)) child(int id)  {
 
 pid_t parent;
 
-int main() {
+int main(int argc, char ** argv) {
+  for (int i = 0; i < argc - 1; i++) {
+    if (!strcmp(argv[i], "-i")) {
+      num_rounds = atoi(argv[++i]);
+    } else if (!strcmp(argv[i], "-t")) {
+      num_children = atoi(argv[++i]);
+    }
+  }
+
   srand(0);
   spec = true;
-  pid_t children[NUM_CHILDREN];
+  pid_t children[num_children];
   parent = getpid();
   beginspec();
-  for (int i = 0; i < NUM_CHILDREN; i++) {
+  for (int i = 0; i < num_children; i++) {
     pid_t pid = fork();
     if (pid == 0) {
       child(i);
@@ -67,7 +74,7 @@ int main() {
   }
   shared->dummy = 1;
   int status;
-  for (int i = 0; i < NUM_CHILDREN; i++) {
+  for (int i = 0; i < num_children; i++) {
     if (waitpid(children[i], &status, 0) == -1) {
       perror("Unable to wait for child");
       exit(-1);
