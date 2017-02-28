@@ -3,7 +3,7 @@ ifneq ($(TRAVIS_CI), 1)
 endif
 
 INCFLAGS = -I./ -I./bomalloc
-DEFS = -DCOLLECT_STATS -DBOMALLOC_SYSTEM_ALLOC -DNO_HOOK -DDEBUG -DSUPPORT_THREADS
+DEFS = -DCOLLECT_STATS -DBOMALLOC_SYSTEM_ALLOC -DNO_HOOK -DDEBUG -DSUPPORT_THREADS -D_GNU_SOURCE
 OPT_FLAGS = -O3 -march=native
 DEBUG_FLAGS = -ggdb3 -g3
 CFLAGS = $(OPT_FLAGS) $(DEBUG_FLAGS) -fPIC -Wall -Wno-missing-braces  $(INCFLAGS) $(DEFS)
@@ -15,7 +15,7 @@ TEST_BINARIES = $(basename $(TEST_SOURCE))
 TEST_OBJECTS = $(patsubst %.c,%.o, $(TEST_SOURCE))
 DEP = $(SOURCE:.c=.d) $(TEST_SOURCE:.c=.d)
 
-OBJECTS = bomalloc.o memmap.o bomalloc_utils.o bomalloc_sync.o bomalloc_overrides.o
+OBJECTS = bomalloc.o memmap.o bomalloc_utils.o bomalloc_sync.o bomalloc_overrides.o file_io.o
 LDFLAGS = -Wl,--no-as-needed -ldl -rdynamic -lm
 LIBRARY = libbomalloc.a
 

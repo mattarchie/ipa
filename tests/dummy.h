@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#include "bomalloc_utils.h"
+
 
 bool speculating() {
   return false;
