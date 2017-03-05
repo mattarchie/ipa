@@ -5,6 +5,7 @@
 #include <math.h>
 #include <assert.h>
 
+#include "bomalloc_hooks.h"
 #include "stack.h"
 
 #if __WORDSIZE == 64
@@ -172,10 +173,6 @@ extern shared_data_t * shared;
 
 // Function prototypes
 
-// If compiled with the approiate flags, print the stats collected
-// during run time
-void print_bomalloc_stats(void);
-bool speculating(void);
 void bomalloc_init(void);
 
 // Utility functions
