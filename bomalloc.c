@@ -31,8 +31,10 @@ static bomalloc_stack_t delayed_frees_reclaimable[NUM_CLASSES] = {0};
 void * inc_heap(intptr_t);
 void free_delayed(void);
 
+void * end_ds = NULL;
+
 bool out_of_range(void * payload) {
-  return payload < (void*) shared->base || payload >= sbrk(0);
+  return payload < (void*) shared->base || payload >= end_ds;
 }
 
 static bool fault_on_pop = false;
@@ -197,6 +199,7 @@ void * inc_heap(intptr_t s) {
     bomalloc_perror("Unable to extend data segment");
     abort();
   }
+  end_ds = sbrk(0);
   return x;
 }
 
