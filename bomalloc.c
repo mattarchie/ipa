@@ -188,16 +188,12 @@ static void grow(size_t aligned) {
   char * base = inc_heap(my_region_size);
   // now map headers for my new (private) address region
   map_headers(base, index, blocks);
-#ifdef COLLECT_STATS
-  __sync_add_and_fetch(&shared->total_blocks, blocks);
-#endif
+  stats_collect(&shared->total_blocks, blocks);
 }
 
 void * inc_heap(intptr_t s) {
-#ifdef COLLECT_STATS
-  __sync_add_and_fetch(&shared->sbrks, 1);
-  __sync_add_and_fetch(&shared->total_alloc, s);
-#endif
+  stats_collect(&shared->sbrks, 1);
+  stats_collect(&shared->total_alloc, s);
   void * x = sbrk(s);
   if (x == (void *) -1) {
     bomalloc_perror("Unable to extend data segment");
@@ -225,7 +221,7 @@ void * bomalloc(size_t size) {
     bomalloc_init();
   }
 #ifdef COLLECT_STATS
-  __sync_add_and_fetch(&shared->allocations, 1);
+  stats_collect(&shared->allocations, 1);
   struct timespec start = timer_start();
 #endif
   if (size == 0) {
@@ -264,8 +260,8 @@ void * bomalloc(size_t size) {
     assert(payload(header) != NULL);
     assert(getblock(payload(header))->header == header);
 #ifdef COLLECT_STATS
-      __sync_add_and_fetch(&shared->time_malloc, timer_end(start));
-      __sync_add_and_fetch(&shared->allocs_per_class[class_for_size(aligned)], 1);
+      stats_collect(&shared->time_malloc, timer_end(start));
+      stats_collect(&shared->allocs_per_class[class_for_size(aligned)], 1);
 #endif
     record_mode_alloc(header);
     record_allocation(payload(header), header->size);
@@ -278,9 +274,7 @@ void * bomalloc(size_t size) {
 }
 
 void bofree(void * payload) {
-#ifdef COLLECT_STATS
-  __sync_add_and_fetch(&shared->frees, 1);
-#endif
+  stats_collect(&shared->frees, 1);
   if (payload == NULL) {
     return;
   }

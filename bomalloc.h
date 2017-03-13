@@ -140,22 +140,23 @@ _Static_assert(__builtin_offsetof(header_page_t, next_page) == 0, "Bad struct: h
 
 
 // Used to collect statics with minimal cache impact
-typedef unsigned line_int_t __attribute__ ((aligned (64))); //64B aligned int
+typedef unsigned stats_int_t __attribute__ ((aligned (64))); //64B aligned int
 
 // Allocated at the start of the program in shared mem.
 typedef struct {
   bomalloc_page_t next_page;
 #ifdef COLLECT_STATS
-  volatile line_int_t allocations;
-  volatile line_int_t frees;
-  volatile line_int_t sbrks;
+  volatile stats_int_t allocations;
+  volatile stats_int_t frees;
+  volatile stats_int_t sbrks;
   volatile unsigned allocs_per_class[NUM_CLASSES];
-  volatile line_int_t huge_allocations;
-  volatile line_int_t header_pages;
-  volatile line_int_t total_blocks; // this includes spec and non spec
-  volatile size_t total_alloc; // total space allocated from the system (heap + mmap)
-  volatile uint64_t time_malloc;
-  volatile line_int_t num_unmaps;
+  volatile stats_int_t huge_allocations;
+  volatile stats_int_t header_pages;
+  volatile stats_int_t total_blocks; // this includes spec and non spec
+  volatile stats_int_t total_alloc; // total space allocated from the system (heap + mmap)
+  volatile stats_int_t time_malloc;
+  volatile stats_int_t num_unmaps;
+  volatile stats_int_t number_mmap; // how many pages where mmaped (headers & large)
 #endif
   volatile bomalloc_stack_t seq_free[NUM_CLASSES]; // sequential free list
   volatile bomalloc_stack_t spec_free[NUM_CLASSES]; // speculative free list
@@ -164,9 +165,15 @@ typedef struct {
   volatile unsigned next_name; // next header file to use
   volatile header_page_t * header_pg; // the address of the first header mmap page
   volatile huge_block_t * large_block; // pointer into the list of large blocks
-  volatile size_t number_mmap; // how many pages where mmaped (headers & large)
   volatile int dummy; // used in unit tests
 } shared_data_t;
+
+
+static inline void stats_collect(volatile stats_int_t * x, unsigned increment) {
+#ifdef COLLECT_STATS
+  __sync_add_and_fetch(x, increment);
+#endif
+}
 
 // Extern data
 extern shared_data_t * shared;

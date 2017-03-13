@@ -207,9 +207,7 @@ static inline bomalloc_page_t * allocate_bomalloc_page(int file_no, size_t minsi
         break;
       } else {
         munmap(allocation, allocation_size);
-#ifdef COLLECT_STATS
-        __sync_add_and_fetch(&shared->num_unmaps, 1);
-#endif
+        stats_collect(&shared->num_unmaps, 1);
       }
     }
     if (file_descriptor != -1) {
@@ -218,10 +216,8 @@ static inline bomalloc_page_t * allocate_bomalloc_page(int file_no, size_t minsi
       }
     }
   }
-#ifdef COLLECT_STATS
-  __sync_add_and_fetch(&shared->total_alloc, allocation_size);
-  __sync_add_and_fetch(&shared->number_mmap, 1);
-#endif
+  stats_collect(&shared->total_alloc, allocation_size);
+  stats_collect(&shared->number_mmap, 1);
   return allocation;
 }
 
@@ -264,9 +260,7 @@ header_page_t * allocate_header_page() {
     }
 #endif
   }
-#ifdef COLLECT_STATS
-  __sync_add_and_fetch(&shared->header_pages, 1);
-#endif
+  stats_collect(&shared->header_pages, 1);
   return headers;
 }
 
@@ -291,8 +285,6 @@ huge_block_t * allocate_large(size_t size) {
   if (block == (huge_block_t *) block->next_page.next_page) {
     abort();
   }
-#ifdef COLLECT_STATS
-  __sync_add_and_fetch(&shared->huge_allocations, 1);
-#endif
+  stats_collect(&shared->huge_allocations, 1);
   return block;
 }
