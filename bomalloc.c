@@ -37,11 +37,13 @@ bool out_of_range(void * payload) {
   return payload < (void*) shared->base || payload >= end_ds;
 }
 
+#ifdef SHARED_SPEC_BLOCKS
 static bool fault_on_pop = false;
 void map_all_segv(int signo) {
   fault_on_pop = true;
   map_missing_pages_handler();
 }
+#endif
 
 static inline volatile header_t * alloc_pop(size_t size) {
   size_t index = SIZE_TO_CLASS(size);
@@ -50,6 +52,7 @@ static inline volatile header_t * alloc_pop(size_t size) {
     if (!empty(&delayed_frees_reclaimable[index])) {
       return spec_node_to_header(pop_ageless(&delayed_frees_reclaimable[index]));
     } else {
+#ifdef SHARED_SPEC_BLOCKS
       typedef void (*sighandler_t)(int);
       volatile header_t * h = NULL;
       sighandler_t old = signal(SIGSEGV, map_all_segv);
@@ -59,6 +62,9 @@ static inline volatile header_t * alloc_pop(size_t size) {
       } while(h == NULL && fault_on_pop);
       signal(SIGSEGV, old);
       return h;
+#else
+      return spec_node_to_header(pop(&shared->spec_free[index]));
+#endif
     }
   } else {
     // Because pages are never backed to disk and the shared
@@ -174,14 +180,12 @@ static void grow(size_t aligned) {
     // Below, we grow to match the agreed global speculative heap
     // This is done to re-use code for the normal nonspec path
     // which will grow the heap by the amount we need, eg. my_region_size
+    assert(total - my_growth - my_region_size >= 0);
     inc_heap(total - my_growth - my_region_size);
     __sync_add_and_fetch(&my_growth, my_region_size);
   }
   // Grow the heap by the space needed for my allocations
   char * base = inc_heap(my_region_size);
-  if (speculating()) {
-    record_allocation(base, my_region_size);
-  }
   // now map headers for my new (private) address region
   map_headers(base, index, blocks);
 #ifdef COLLECT_STATS
@@ -241,6 +245,7 @@ void * bomalloc(size_t size) {
     }
     assert(payload(header) != NULL);
     // Ensure that the payload is in my allocated memory
+#ifdef SHARED_SPEC_BLOCKS
     if (out_of_range(payload(header))) {
       // heap needs to extend to header->payload + header->size
       void * pl = payload(header);
@@ -252,6 +257,7 @@ void * bomalloc(size_t size) {
       block->header = (header_t *) header;
       // getblock(payload(header))->header = (header_t *) header;
     }
+#endif
     if (getblock(payload(header))->header != header) {
       getblock(payload(header))->header = (header_t *) header;
     }
