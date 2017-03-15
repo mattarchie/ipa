@@ -20,7 +20,7 @@
 
 shared_data_t * shared;
 volatile header_page_t * first_full = NULL;
-size_t my_growth;
+volatile size_t my_growth;
 
 extern header_page_t * seq_headers;
 
@@ -165,27 +165,38 @@ void bomalloc_init() {
     shared->next_page.next_page = NULL;
   }
 }
-
 static void grow(size_t aligned) {
   // Need to grow the space
   size_t index = class_for_size(aligned);
   size_t size = CLASS_TO_SIZE(index);
   assert(size > 0);
-  size_t blocks = MIN(HEADERS_PER_PAGE, MAX(1024 / size, 15));
+  size_t blocks = MIN(HEADERS_PER_PAGE, MAX(PAGE_SIZE / size, 15));
+  char * base;
 
   const intptr_t my_region_size = size * blocks;
   if (speculating()) {
     // first allocate the extra space that's needed. Don't record the to allocation
     const intptr_t total = __sync_add_and_fetch(&shared->spec_growth, my_region_size);
+    const intptr_t sync_space = total - my_region_size;
     // Below, we grow to match the agreed global speculative heap
     // This is done to re-use code for the normal nonspec path
     // which will grow the heap by the amount we need, eg. my_region_size
     assert(total - my_growth - my_region_size >= 0);
-    inc_heap(total - my_growth - my_region_size);
-    __sync_add_and_fetch(&my_growth, my_region_size);
+    assert(total >= my_region_size);
+    // printf("pid %d total %d my_growth %lu\n", getpid(), total, my_growth);
+    char * inc_heap_ret = inc_heap(total - my_growth);
+    base = ((char *) shared->spec_base) + sync_space;
+    stats_collect(&shared->spec_sbrks, 1);
+    // printf("pid %d base %p hret %p sbrk %p  total %d my_growth %lu\n",
+    //         getpid(), base, inc_heap_ret,  sbrk(0), total, my_growth);
+    my_growth += my_region_size;
+  } else {
+     base = inc_heap(my_region_size);
   }
   // Grow the heap by the space needed for my allocations
-  char * base = inc_heap(my_region_size);
+  // char * base = inc_heap(my_region_size);
+  if (speculating()) {
+  }
   // now map headers for my new (private) address region
   map_headers(base, index, blocks);
   stats_collect(&shared->total_blocks, blocks);
@@ -252,6 +263,7 @@ void * bomalloc(size_t size) {
       inc_heap(growth);
       block->header = (header_t *) header;
       // getblock(payload(header))->header = (header_t *) header;
+      abort();
     }
 #endif
     if (getblock(payload(header))->header != header) {

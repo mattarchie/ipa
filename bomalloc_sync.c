@@ -20,10 +20,13 @@ extern volatile header_page_t * first_full;
 
 void beginspec() {
   assert(speculating()); // TODO -- probably special case this function
-  bomalloc_init();
+  // void * end_ds = sbrk(0);
+  // printf("sbrk pre-spec 0x%p\n", end_ds);
   my_growth = 0;
+  bomalloc_init();
+  shared->spec_base = sbrk(0);
   map_missing_pages();
-  synch_lists();
+  // synch_lists();
   set_large_perm(MAP_PRIVATE);
   first_full = NULL;
 }

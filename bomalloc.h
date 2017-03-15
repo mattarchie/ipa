@@ -140,7 +140,7 @@ _Static_assert(__builtin_offsetof(header_page_t, next_page) == 0, "Bad struct: h
 
 
 // Used to collect statics with minimal cache impact
-typedef unsigned stats_int_t __attribute__ ((aligned (64))); //64B aligned int
+typedef volatile unsigned stats_int_t __attribute__ ((aligned (64))); //64B aligned int
 
 // Allocated at the start of the program in shared mem.
 typedef struct {
@@ -157,11 +157,13 @@ typedef struct {
   volatile stats_int_t time_malloc;
   volatile stats_int_t num_unmaps;
   volatile stats_int_t number_mmap; // how many pages where mmaped (headers & large)
+  volatile stats_int_t spec_sbrks;
 #endif
   volatile bomalloc_stack_t seq_free[NUM_CLASSES]; // sequential free list
   volatile bomalloc_stack_t spec_free[NUM_CLASSES]; // speculative free list
   volatile size_t base; //where segment begins (cache)
   volatile size_t spec_growth; // grow (B) done by spec group
+  volatile void * spec_base;
   volatile unsigned next_name; // next header file to use
   volatile header_page_t * header_pg; // the address of the first header mmap page
   volatile huge_block_t * large_block; // pointer into the list of large blocks

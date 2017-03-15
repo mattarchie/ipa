@@ -3,8 +3,8 @@ ifneq ($(TRAVIS_CI), 1)
 endif
 
 INCFLAGS = -I./ -I./bomalloc
-DEFS = -DCOLLECT_STATS -DBOMALLOC_SYSTEM_ALLOC -DNO_HOOK -DDEBUG -DSUPPORT_THREADS -D_GNU_SOURCE
-OPT_FLAGS = -O3 -march=native
+DEFS = -DCOLLECT_STATS -DBOMALLOC_SYSTEM_ALLOC -DNO_HOOK -DSUPPORT_THREADS -USUPPORT_THREADS -D_GNU_SOURCE
+OPT_FLAGS = -O2 -march=native
 DEBUG_FLAGS = -ggdb3 -g3
 CFLAGS = $(OPT_FLAGS) $(DEBUG_FLAGS) -fPIC -Wall -Wno-missing-braces  $(INCFLAGS) $(DEFS)
 TEST_SOURCE = $(wildcard tests/*.c) $(wildcard tests/parallel/*.c)
@@ -56,6 +56,11 @@ tests: $(TEST_OBJECTS) $(TEST_BINARIES)
 test: $(TEST_BINARIES)
 	@echo Test binaries: $(sort $(notdir $(TEST_BINARIES)))
 	@ruby tests/test_runner.rb $(sort $(TEST_BINARIES))
+	@echo "Running conflict free tests"
+	@echo "Testing normal sized allocations"
+	@./tests/speculating -i 10000 -t 4  | ruby tests/no_conflict.rb
+	@echo "Testing large sized allocations"
+	@./tests/speculating -i 10000 -t 4 -s -1 | ruby tests/no_conflict.rb
 
 clean:
 	rm -f $(TEST_OBJECTS) $(TEST_BINARIES) $(OBJECTS) gmon.out $(LIBRARY)

@@ -11,6 +11,7 @@
 
 int num_rounds = 200;
 int num_children = 4;
+size_t alloc_size = sizeof(int);
 
 #define PER_EACH (num_rounds / num_children)
 
@@ -32,15 +33,18 @@ int getuniqueid() {
   return (int) getpgid(getpid());
 }
 
-void __attribute__((noreturn)) child(int id)  {
+void __attribute__((noreturn)) child(const int id)  {
   spec = true;
-  size_t alloc_size = sizeof(int); //MAX_SIZE + sizeof(block_t) + 1;
   while (shared->dummy == 0) {
     ;
   }
+  void * start_ds = sbrk(0);
+  assert(spec);
+  // printf("child %d (pid %d) sbrk at start %p\n", id, getpid(), start_ds);
   for (size_t  rnd = PER_EACH * id; rnd < PER_EACH * (id + 1); rnd++) {
     int * payload = bomalloc(alloc_size);
-    printf("rnd %lu Allocated %p\n", rnd, payload);
+    *payload = 0xdeadbeef;
+    printf("child %d Allocated %p\n", id, payload);
   }
   printf("Child %d exits\n", id);
   exit(0);
@@ -54,14 +58,21 @@ int main(int argc, char ** argv) {
       num_rounds = atoi(argv[++i]);
     } else if (!strcmp(argv[i], "-t")) {
       num_children = atoi(argv[++i]);
+    } else if (!strcmp(argv[i], "-s")) {
+      alloc_size = atoi(argv[++i]);
+      if (alloc_size == -1) {
+        alloc_size = MAX_SIZE + sizeof(block_t) + 1;
+      }
     }
   }
-
+  printf("Running with %u children %u total allocations of size %lu\n",
+        num_children, num_rounds, alloc_size);
   srand(0);
-  spec = true;
   pid_t children[num_children];
   parent = getpid();
+  spec = true;
   beginspec();
+  printf("sbrk start = %p\n", sbrk(0));
   for (int i = 0; i < num_children; i++) {
     pid_t pid = fork();
     if (pid == 0) {
@@ -84,7 +95,7 @@ int main(int argc, char ** argv) {
   }
   endspec(true);
   spec = false;
-  printf("Large spec allocation test passed!\n");
+  printf("Spec allocation test finished!\n");
   print_bomalloc_stats();
   bomalloc_teardown();
 }
