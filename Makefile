@@ -60,7 +60,7 @@ test: $(TEST_BINARIES)
 	@echo "Testing normal sized allocations"
 	@./tests/speculating -i 10000 -t 4  | ruby tests/no_conflict.rb
 	@echo "Testing large sized allocations"
-	@./tests/speculating -i 10000 -t 4 -s -1 | ruby tests/no_conflict.rb
+	@./tests/speculating -i 500 -t 4 -s -1 | ruby tests/no_conflict.rb
 
 clean:
 	rm -f $(TEST_OBJECTS) $(TEST_BINARIES) $(OBJECTS) gmon.out $(LIBRARY)
