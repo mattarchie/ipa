@@ -26,7 +26,7 @@ void beginspec() {
   bomalloc_init();
   shared->spec_base = sbrk(0);
   map_missing_pages();
-  // synch_lists();
+  synch_lists();
   set_large_perm(MAP_PRIVATE);
   first_full = NULL;
 }

@@ -140,7 +140,7 @@ _Static_assert(__builtin_offsetof(header_page_t, next_page) == 0, "Bad struct: h
 
 
 // Used to collect statics with minimal cache impact
-typedef volatile unsigned stats_int_t __attribute__ ((aligned (64))); //64B aligned int
+typedef volatile unsigned long stats_int_t __attribute__ ((aligned (64))); //64B aligned int
 
 // Allocated at the start of the program in shared mem.
 typedef struct {
@@ -149,7 +149,7 @@ typedef struct {
   volatile stats_int_t allocations;
   volatile stats_int_t frees;
   volatile stats_int_t sbrks;
-  volatile unsigned allocs_per_class[NUM_CLASSES];
+  volatile unsigned long allocs_per_class[NUM_CLASSES];
   volatile stats_int_t huge_allocations;
   volatile stats_int_t header_pages;
   volatile stats_int_t total_blocks; // this includes spec and non spec

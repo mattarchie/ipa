@@ -42,20 +42,20 @@ void print_bomalloc_stats() {
   int index;
   setlocale(LC_ALL,"");
   printf("BOMALLOC stats\n");
-  printf("allocations: %u\n", snapshot.allocations);
-  printf("frees: %u\n", snapshot.frees);
-  printf("sbrks: %u\n", snapshot.sbrks);
-  printf("spec sbrks: %u\n", snapshot.spec_sbrks);
-  printf("blocks: %u\n", snapshot.total_blocks);
-  printf("huge allocations: %u\n", snapshot.huge_allocations);
-  printf("header pages: %u\n", snapshot.header_pages);
-  printf("Unmappings: %u\n",snapshot.num_unmaps);
+  printf("allocations: %lu\n", snapshot.allocations);
+  printf("frees: %lu\n", snapshot.frees);
+  printf("sbrks: %lu\n", snapshot.sbrks);
+  printf("spec sbrks: %lu\n", snapshot.spec_sbrks);
+  printf("blocks: %lu\n", snapshot.total_blocks);
+  printf("huge allocations: %lu\n", snapshot.huge_allocations);
+  printf("header pages: %lu\n", snapshot.header_pages);
+  printf("Unmappings: %lu\n",snapshot.num_unmaps);
   printf("headers / page: %lu\n", HEADERS_PER_PAGE);
   printf("Time spent allocating: %'lu ns (%'.5lf s)\n", snapshot.time_malloc, TIME_TO_SEC(snapshot.time_malloc));
   double average = ((double) snapshot.time_malloc) / snapshot.allocations;
   printf("Average time per allocation: %'.2lf ns\n", average);
   for (index = 0; index < NUM_CLASSES; index++) {
-    printf("class %2d (%'10lu B) allocations: %u\n", index, CLASS_TO_SIZE(index), snapshot.allocs_per_class[index]);
+    printf("class %2d (%'10lu B) allocations: %lu\n", index, CLASS_TO_SIZE(index), snapshot.allocs_per_class[index]);
   }
   printf("Total managed memory:\n\t%'lu B\n\t%'.0lf pages\n\t%'.2lf GB\n\t%'.2lf TB\n",
           (size_t) snapshot.total_alloc,

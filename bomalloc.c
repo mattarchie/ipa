@@ -184,11 +184,9 @@ static void grow(size_t aligned) {
     assert(total - my_growth - my_region_size >= 0);
     assert(total >= my_region_size);
     // printf("pid %d total %d my_growth %lu\n", getpid(), total, my_growth);
-    char * inc_heap_ret = inc_heap(total - my_growth);
+    inc_heap(total - my_growth);
     base = ((char *) shared->spec_base) + sync_space;
     stats_collect(&shared->spec_sbrks, 1);
-    // printf("pid %d base %p hret %p sbrk %p  total %d my_growth %lu\n",
-    //         getpid(), base, inc_heap_ret,  sbrk(0), total, my_growth);
     my_growth += my_region_size;
   } else {
      base = inc_heap(my_region_size);

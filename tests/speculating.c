@@ -38,7 +38,6 @@ void __attribute__((noreturn)) child(const int id)  {
   while (shared->dummy == 0) {
     ;
   }
-  void * start_ds = sbrk(0);
   assert(spec);
   // printf("child %d (pid %d) sbrk at start %p\n", id, getpid(), start_ds);
   for (size_t  rnd = PER_EACH * id; rnd < PER_EACH * (id + 1); rnd++) {
