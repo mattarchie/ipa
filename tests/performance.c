@@ -33,7 +33,7 @@ int getuniqueid() {
   return (int) getpgid(getpid());
 }
 
-void __attribute__((noreturn)) child(const int id)  {
+void __attribute__((noreturn)) child_constant(const int id)  {
   spec = true;
   while (shared->dummy == 0) {
     ;
@@ -46,10 +46,41 @@ void __attribute__((noreturn)) child(const int id)  {
   }
   exit(0);
 }
+static inline size_t random_class () {
+    double d;
+    do {
+       d = (((rand () * RS_SCALE) + rand ()) * RS_SCALE + rand ()) * RS_SCALE;
+    } while (d >= 1); /* Round off */
+    return d * NUM_CLASSES;
+}
+
+static inline size_t uniform_size_class() {
+  return ALIGN(CLASS_TO_SIZE(random_class()) - sizeof(block_t));
+}
+
+void __attribute__((noreturn)) child_random(const int id)  {
+  spec = true;
+  while (shared->dummy == 0) {
+    ;
+  }
+  assert(spec);
+  srand(id);
+  // printf("child %d (pid %d) sbrk at start %p\n", id, getpid(), start_ds);
+  for (size_t  rnd = PER_EACH * id; rnd < PER_EACH * (id + 1); rnd++) {
+    alloc_size = uniform_size_class();
+    int * payload = bomalloc(alloc_size);
+    *payload = 0xdeadbeef;
+  }
+  exit(0);
+}
+
+
 
 pid_t parent;
 
 int main(int argc, char ** argv) {
+  bool use_random = false;
+
   for (int i = 0; i < argc - 1; i++) {
     if (!strcmp(argv[i], "-i")) {
       num_rounds = atoi(argv[++i]);
@@ -59,11 +90,17 @@ int main(int argc, char ** argv) {
       alloc_size = atoi(argv[++i]);
       if (alloc_size == -1) {
         alloc_size = MAX_SIZE + sizeof(block_t) + 1;
+      } else if (alloc_size == -2) {
+        use_random = true;
       }
     }
   }
-  printf("Running with %u children %u total allocations of size %lu\n",
+  if (use_random) {
+	  printf("Running with %u children %u total allocations of random size\n", num_children, num_rounds);
+  } else {
+	  printf("Running with %u children %u total allocations of size %lu\n",
         num_children, num_rounds, alloc_size);
+  }
   srand(0);
   pid_t children[num_children];
   parent = getpid();
@@ -72,7 +109,11 @@ int main(int argc, char ** argv) {
   for (int i = 0; i < num_children; i++) {
     pid_t pid = fork();
     if (pid == 0) {
-      child(i);
+      if (use_random) {
+        child_random(i);
+      } else {
+        child_constant(i);
+      }
     } else if (pid == -1) {
       perror("Unable to fork process");
       exit(-1);
@@ -91,7 +132,5 @@ int main(int argc, char ** argv) {
   }
   endspec(true);
   spec = false;
-  printf("Spec allocation test finished!\n");
   print_bomalloc_stats();
-  bomalloc_teardown();
 }
