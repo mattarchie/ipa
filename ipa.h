@@ -178,6 +178,11 @@ static inline void stats_collect(volatile stats_int_t * x, unsigned increment) {
 #endif
 }
 
+static inline void page_collect(volatile stats_int_t * x, unsigned s) {
+  double frames = ((double) s) / PAGE_SIZE;
+  stats_collect(x, ceil(frames));
+}
+
 // Extern data
 extern shared_data_t * shared;
 
