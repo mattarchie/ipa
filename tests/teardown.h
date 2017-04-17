@@ -1,9 +1,9 @@
 #ifndef __TEST_TEARDOWN
 #define __TEST_TEARDOWN
-#include "bomalloc.h"
+#include "ipa.h"
 
 static void __attribute__((destructor)) test_teardown() {
-  bomalloc_teardown();
+  ipa_teardown();
 }
 
 #endif

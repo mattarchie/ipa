@@ -14,10 +14,10 @@
 #include <errno.h>
 #include <signal.h>
 
-#include "bomalloc.h"
+#include "ipa.h"
 #include "file_io.h"
-#include "bomalloc_utils.h"
-#include "bomalloc_hooks.h"
+#include "ipa_utils.h"
+#include "ipa_hooks.h"
 
 static inline int mkdir_ne(char * path, int flags) {
   struct stat st = {0};
@@ -30,7 +30,7 @@ static inline int mkdir_ne(char * path, int flags) {
 size_t get_size_fd(int fd) {
   struct stat st;
   if (fstat(fd, &st) == -1) {
-    bomalloc_perror("Unable to get size of file");
+    ipa_perror("Unable to get size of file");
   }
   return st.st_size;
 }
@@ -64,17 +64,17 @@ size_t get_size_name(unsigned name) {
   int written;
   written = snprintf(&path[0], sizeof(path), "%s%d/%u", "/tmp/bop/", getuniqueid(), name);
   if (written > sizeof(path) || written < 0) {
-    bomalloc_perror("Unable to write the output path");
+    ipa_perror("Unable to write the output path");
     abort();
   }
   int fd = open(path, O_RDONLY);
   if (fd == -1) {
-    bomalloc_perror("Unable to open existing file");
+    ipa_perror("Unable to open existing file");
     abort();
   }
   size_t size = get_size_fd(fd);
   if (close(fd)) {
-    bomalloc_perror("Unable to close fd used for temp size pole");
+    ipa_perror("Unable to close fd used for temp size pole");
   }
   return size;
 }
@@ -92,30 +92,30 @@ static inline int mmap_fd_bool(unsigned file_no, size_t size, bool no_fd) {
   // ensure the directory is present
   written = snprintf(&path[0], sizeof(path), "%s%d/", "/tmp/bop/", getuniqueid());
   if (written > sizeof(path) || written < 0) {
-    bomalloc_perror("Unable to write directory name");
+    ipa_perror("Unable to write directory name");
     abort();
   }
 
   if (rmkdir(&path[0]) != 0 && errno != EEXIST) {
-    bomalloc_perror("Unable to make the directory");
+    ipa_perror("Unable to make the directory");
     abort();
   }
   // now create the file
   written = snprintf(&path[0], sizeof(path), "%s%d/%u", "/tmp/bop/", getuniqueid(), file_no);
   if (written > sizeof(path) || written < 0) {
-    bomalloc_perror("Unable to write the output path");
+    ipa_perror("Unable to write the output path");
     abort();
   }
 
   int fd = open(path, O_RDWR | O_CREAT | O_SYNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
   if (fd == -1) {
-    bomalloc_perror("Unable to create the file.");
+    ipa_perror("Unable to create the file.");
     abort();
   }
   if (get_size_fd(fd) < size) {
     // need to truncate (grow -- poor naming) the file
     if (ftruncate(fd, size) < 0) {
-      bomalloc_perror("BOMALLOC_MMAP: Unable to truncate/grow file");
+      ipa_perror("BOMALLOC_MMAP: Unable to truncate/grow file");
       abort();
     }
   }

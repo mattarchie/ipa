@@ -6,8 +6,8 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <errno.h>
-#include "bomalloc.h"
-#include "bomalloc_utils.h"
+#include "ipa.h"
+#include "ipa_utils.h"
 
 int num_rounds = 200;
 int num_children = 4;
@@ -41,7 +41,7 @@ void __attribute__((noreturn)) child_constant(const int id)  {
   assert(spec);
   // printf("child %d (pid %d) sbrk at start %p\n", id, getpid(), start_ds);
   for (size_t  rnd = PER_EACH * id; rnd < PER_EACH * (id + 1); rnd++) {
-    int * payload = bomalloc(alloc_size);
+    int * payload = ipa_malloc(alloc_size);
     *payload = 0xdeadbeef;
   }
   exit(0);
@@ -68,7 +68,7 @@ void __attribute__((noreturn)) child_random(const int id)  {
   // printf("child %d (pid %d) sbrk at start %p\n", id, getpid(), start_ds);
   for (size_t  rnd = PER_EACH * id; rnd < PER_EACH * (id + 1); rnd++) {
     alloc_size = uniform_size_class();
-    int * payload = bomalloc(alloc_size);
+    int * payload = ipa_malloc(alloc_size);
     *payload = 0xdeadbeef;
   }
   exit(0);
@@ -132,5 +132,5 @@ int main(int argc, char ** argv) {
   }
   endspec(true);
   spec = false;
-  print_bomalloc_stats();
+  print_ipa_stats();
 }

@@ -1,6 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include "bomalloc.h"
+#include "ipa.h"
 #include "dummy.h"
 #include "teardown.h"
 
@@ -21,12 +21,12 @@ int main() {
 
   for (rnd = 0; rnd < NUM_ROUNDS; rnd++) {
     alloc_size = MAX_SIZE + sizeof(block_t) + 1;
-    int * payload = bomalloc(alloc_size);
+    int * payload = ipa_malloc(alloc_size);
     ptrs[rnd] = payload;
     for (check = 0; check < rnd; check++) {
       assert(ptrs[check] != payload);
     }
   }
   printf("Basic allocation test passed\n");
-  print_bomalloc_stats();
+  print_ipa_stats();
 }

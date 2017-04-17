@@ -4,7 +4,7 @@
 #include <unistd.h>
 #include <signal.h>
 
-#include "bomalloc.h"
+#include "ipa.h"
 #include "dummy.h"
 #include "teardown.h"
 
@@ -20,7 +20,7 @@ void parent(int * payload1, pid_t child, void* value) {
 extern shared_data_t * shared;
 
 int main() {
-  int * payload1 = bomalloc(sizeof(int));
+  int * payload1 = ipa_malloc(sizeof(int));
   void * value = main;
   pid_t child = fork();
   if (child == 0) {

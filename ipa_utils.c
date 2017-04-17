@@ -6,22 +6,22 @@
 #include <error.h>
 #include <unistd.h>
 #include <errno.h>
-#include "bomalloc.h"
+#include "ipa.h"
 #include "timing.h" // Used for the time to seconds macro
 
 // Require placing data in user-supplied buffer
 
-void bomalloc_strerr(char * buffer, size_t len) {
+void ipa_strerr(char * buffer, size_t len) {
   // For now, no error handling
   assert(strerror_r(errno, buffer, len) == 0);
 }
 
 // Get the
-void bomalloc_perror(const char * msg) {
+void ipa_perror(const char * msg) {
   char error_buffer[512]; // holds strerror
   char master_buffer[2048]; // final thing to write out
   // Get the error string
-  bomalloc_strerr(&error_buffer[0], sizeof(error_buffer));
+  ipa_strerr(&error_buffer[0], sizeof(error_buffer));
   size_t tsize = snprintf(&master_buffer[0], sizeof(master_buffer), "%s: %s\n", msg, &error_buffer[0]);
   // Get
 
@@ -33,7 +33,7 @@ void bomalloc_perror(const char * msg) {
 #include <locale.h>
 #include <math.h>
 
-void print_bomalloc_stats() {
+void print_ipa_stats() {
 #ifdef COLLECT_STATS
   shared_data_t snapshot = *shared;
   if (!isatty(fileno(stderr))) {
@@ -74,7 +74,7 @@ void print_bomalloc_stats() {
 
 extern int getuniqueid(void);
 
-void bomalloc_teardown() {
+void ipa_teardown() {
   char path[2048];
   int written;
   bool no_errors = true;
@@ -82,22 +82,22 @@ void bomalloc_teardown() {
   for (int i = 1; i <= shared->next_name; i++) {
     written = snprintf(&path[0], sizeof(path), "%s%d/%d", "/tmp/bop/", getuniqueid(), i);
     if (written > sizeof(path) || written < 0) {
-      bomalloc_perror("Unable to write directory name for cleanup");
+      ipa_perror("Unable to write directory name for cleanup");
       no_errors = false;
       continue;
     }
     if (remove(path)) {
-      bomalloc_perror("Unable to remove file");
+      ipa_perror("Unable to remove file");
       no_errors = false;
     }
   }
   if (no_errors && shared->next_name != 0) {
     written = snprintf(&path[0], sizeof(path), "%s%d/", "/tmp/bop/", getuniqueid());
     if (written > sizeof(path) || written < 0) {
-      bomalloc_perror("Unable to write directory name for cleanup");
+      ipa_perror("Unable to write directory name for cleanup");
     }
     if (remove(path)) {
-      bomalloc_perror("Unable to remove directory");
+      ipa_perror("Unable to remove directory");
     }
   }
 }

@@ -1,16 +1,16 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include "bomalloc.h"
+#include "ipa.h"
 #include "dummy.h"
 #include "teardown.h"
 
 int main() {
-  int * payload = bomalloc(MAX_SIZE + 1);
-  printf("bomalloc payload %p\n", payload);
+  int * payload = ipa_malloc(MAX_SIZE + 1);
+  printf("ipa payload %p\n", payload);
   *payload = 42;
   printf("Large allocation passed\n");
   bofree(payload);
   printf("Successfully freed large block\n");
-  print_bomalloc_stats();
+  print_ipa_stats();
   return 0;
 }

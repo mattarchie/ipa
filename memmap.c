@@ -14,19 +14,19 @@
 #include <errno.h>
 #include <signal.h>
 
-#include "bomalloc.h"
+#include "ipa.h"
 #include "memmap.h"
-#include "bomalloc_utils.h"
+#include "ipa_utils.h"
 #include "file_io.h"
 
 
 
-static void map_now(volatile bomalloc_page_t *);
+static void map_now(volatile ipa_page_t *);
 extern shared_data_t * shared;
 extern bool speculating(void);
-extern void bomalloc_init(void);
+extern void ipa_init(void);
 
-static volatile bomalloc_page_t * map_info;
+static volatile ipa_page_t * map_info;
 static bool is_mapped_bool;
 
 header_page_t * seq_headers, * seq_headers_last;
@@ -44,7 +44,7 @@ bool is_addr_mapped(volatile void * address) {
   is_mapped_bool = true;
   typeof(&segv_bool_test) old = signal(SIGSEGV, segv_bool_test);
   if (old == SIG_ERR) {
-    bomalloc_perror("Unable to install signal handler");
+    ipa_perror("Unable to install signal handler");
     abort();
   }
   __sync_synchronize();
@@ -54,29 +54,29 @@ bool is_addr_mapped(volatile void * address) {
   return is_mapped_bool;
 }
 
-bool is_mapped_segv_check(volatile bomalloc_page_t * prev)  {
+bool is_mapped_segv_check(volatile ipa_page_t * prev)  {
   map_info = prev;
   is_mapped_bool = true;
   typeof(&map_handler) old = signal(SIGSEGV, map_handler);
   if (old == SIG_ERR) {
-    bomalloc_perror("Unable to install signal handler");
+    ipa_perror("Unable to install signal handler");
     abort();
   }
   __sync_synchronize();
-  volatile bomalloc_page_t __attribute__((__unused__)) data = *(bomalloc_page_t *) prev->next_page;
+  volatile ipa_page_t __attribute__((__unused__)) data = *(ipa_page_t *) prev->next_page;
   __sync_synchronize();
   signal(SIGSEGV, old);
   return is_mapped_bool;
 }
 
 bool is_mapped(void * ptr) {
-  bomalloc_page_t * aligned = (bomalloc_page_t *) (((intptr_t) ptr) & ~(PAGE_SIZE  - 1));
+  ipa_page_t * aligned = (ipa_page_t *) (((intptr_t) ptr) & ~(PAGE_SIZE  - 1));
   bool b = !(msync((void *) aligned, 1, MS_ASYNC) == -1 && errno == ENOMEM);
   // errno = 0;
   return b;
 }
 
-static void map_now (volatile bomalloc_page_t * last_page) {
+static void map_now (volatile ipa_page_t * last_page) {
   if (last_page->next_pg_name == (unsigned) -1) {
     abort();
   }
@@ -92,12 +92,12 @@ static void map_now (volatile bomalloc_page_t * last_page) {
     }
     close(fd); // think can do here
     assert(is_mapped((void *) last_page->next_page));
-    if ((bomalloc_page_t *) last_page->next_page == last_page) {
+    if ((ipa_page_t *) last_page->next_page == last_page) {
       abort();
     }
   }
 }
-static inline bool full_map_check(bool faulting, volatile bomalloc_page_t * prev) {
+static inline bool full_map_check(bool faulting, volatile ipa_page_t * prev) {
   if (prev->next_pg_name == -1) {
     return true;
   } else if (!faulting) {
@@ -109,11 +109,11 @@ static inline bool full_map_check(bool faulting, volatile bomalloc_page_t * prev
 
 // Map all missing pages
 // Returns the last non-null page (eg. the one with the next page filed set to null)
-static inline volatile bomalloc_page_t * map_missing_pages_safe(bool faulting) {
-  static volatile bomalloc_page_t * cache = NULL;
-  volatile bomalloc_page_t * start = cache == NULL ? &shared->next_page : cache;
-  volatile bomalloc_page_t * last_page = start;
-  volatile bomalloc_page_t * prev __attribute__((unused)) = NULL;
+static inline volatile ipa_page_t * map_missing_pages_safe(bool faulting) {
+  static volatile ipa_page_t * cache = NULL;
+  volatile ipa_page_t * start = cache == NULL ? &shared->next_page : cache;
+  volatile ipa_page_t * last_page = start;
+  volatile ipa_page_t * prev __attribute__((unused)) = NULL;
   // These are for debugging, volatile so they can't be removed by compiler
   volatile int rounds = 0, maps = 0;
   if (start->next_page != NULL) {
@@ -122,13 +122,13 @@ static inline volatile bomalloc_page_t * map_missing_pages_safe(bool faulting) {
       map_now(start);
       assert(is_mapped((void *)  start->next_page));
     }
-    for (last_page = start; last_page->next_page != NULL; prev = last_page,  last_page = (volatile bomalloc_page_t *) last_page->next_page) {
+    for (last_page = start; last_page->next_page != NULL; prev = last_page,  last_page = (volatile ipa_page_t *) last_page->next_page) {
       rounds++;
       if (!full_map_check(faulting, last_page)) {
         maps++;
         map_now(last_page);
       }
-      if ((bomalloc_page_t *) last_page->next_page == last_page) {
+      if ((ipa_page_t *) last_page->next_page == last_page) {
         // last_page->next_page = NULL;
         // last_page->next_pg_name = 0;
         // break;
@@ -139,7 +139,7 @@ static inline volatile bomalloc_page_t * map_missing_pages_safe(bool faulting) {
   return last_page;
 }
 
-volatile bomalloc_page_t * map_missing_pages() {
+volatile ipa_page_t * map_missing_pages() {
   return map_missing_pages_safe(false);
 }
 
@@ -150,15 +150,15 @@ void map_missing_pages_handler() {
 /**
  * MMap a page according to @type
  *
- * @method allocate_bomalloc_page
+ * @method allocate_ipa_page
  *
  * @param  minsize             the minimal size of the allocation, including any headers
  * @param  flags               baseline flags to pass to mmap, MAP_FIXED always added,
  *                             	MAP_ANONYMOUS while not speculating
  */
-static inline bomalloc_page_t * allocate_bomalloc_page(int file_no, size_t minsize, int flags) {
-  bomalloc_page_t * allocation = NULL;
-  bomalloc_page_t alloc = {0};
+static inline ipa_page_t * allocate_ipa_page(int file_no, size_t minsize, int flags) {
+  ipa_page_t * allocation = NULL;
+  ipa_page_t alloc = {0};
   // Reserve the resources in shared for this allocation
   int file_descriptor;
   size_t allocation_size = MAX(minsize, PAGE_SIZE);
@@ -170,7 +170,7 @@ static inline bomalloc_page_t * allocate_bomalloc_page(int file_no, size_t minsi
     flags &= ~MAP_PRIVATE;
     flags |= MAP_SHARED;
   }
-  volatile bomalloc_page_t * last_page;
+  volatile ipa_page_t * last_page;
 
   if (file_no == -1) {
     allocation = mmap(NULL, allocation_size, PROT_READ | PROT_WRITE, flags, -1, 0);
@@ -186,7 +186,7 @@ static inline bomalloc_page_t * allocate_bomalloc_page(int file_no, size_t minsi
        */
       allocation = mmap(NULL, allocation_size, PROT_READ | PROT_WRITE, flags, file_descriptor, 0);
       if (allocation == MAP_FAILED) {
-        bomalloc_perror("Unable to set up mmap page");
+        ipa_perror("Unable to set up mmap page");
         abort();
       }
 #ifdef MANUAL_ZERO
@@ -195,15 +195,15 @@ static inline bomalloc_page_t * allocate_bomalloc_page(int file_no, size_t minsi
       allocation->next_page =  NULL;
       allocation->next_pg_name = 0;
 
-      alloc.next_page = (struct bomalloc_page_t *) allocation;
+      alloc.next_page = (struct ipa_page_t *) allocation;
       alloc.next_pg_name = file_no;
-      if (last_page == (volatile bomalloc_page_t *) last_page->next_page) {
+      if (last_page == (volatile ipa_page_t *) last_page->next_page) {
         abort();
       }
       if (__sync_bool_compare_and_swap(&last_page->combined, 0, alloc.combined)) {
-        assert( (bomalloc_page_t *) last_page->next_page == allocation);
-        assert( (bomalloc_page_t *) allocation->next_page != last_page);
-        assert( (bomalloc_page_t *) allocation->next_page != allocation);
+        assert( (ipa_page_t *) last_page->next_page == allocation);
+        assert( (ipa_page_t *) allocation->next_page != last_page);
+        assert( (ipa_page_t *) allocation->next_page != allocation);
         break;
       } else {
         munmap(allocation, allocation_size);
@@ -212,7 +212,7 @@ static inline bomalloc_page_t * allocate_bomalloc_page(int file_no, size_t minsi
     }
     if (file_descriptor != -1) {
       if (close(file_descriptor)) {
-        bomalloc_perror("Unable to close file descriptor");
+        ipa_perror("Unable to close file descriptor");
       }
     }
   }
@@ -224,7 +224,7 @@ static inline bomalloc_page_t * allocate_bomalloc_page(int file_no, size_t minsi
 header_page_t * allocate_header_page() {
   // headers are always shared -- always increment name
   const int file_no = __sync_add_and_fetch(&shared->next_name, 1);
-  header_page_t * headers = (header_page_t *) allocate_bomalloc_page(file_no, MAX(PAGE_SIZE, sizeof(header_page_t)), MAP_SHARED);
+  header_page_t * headers = (header_page_t *) allocate_ipa_page(file_no, MAX(PAGE_SIZE, sizeof(header_page_t)), MAP_SHARED);
 
   if (headers == (header_page_t *) -1) {
     exit(-1);
@@ -270,7 +270,7 @@ huge_block_t * allocate_large(size_t size) {
   size_t alloc_size = PAGE_ALIGN((size + sizeof(huge_block_t)));
   assert(alloc_size > size);
   assert(alloc_size % PAGE_SIZE == 0);
-  huge_block_t * block = (huge_block_t *) allocate_bomalloc_page(file_no, alloc_size, MAP_PRIVATE);
+  huge_block_t * block = (huge_block_t *) allocate_ipa_page(file_no, alloc_size, MAP_PRIVATE);
   if (block == (huge_block_t *) -1) {
     return NULL;
   }

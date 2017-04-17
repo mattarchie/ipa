@@ -7,9 +7,9 @@
 #include <stdio.h>
 
 #include "stack.h"
-#include "bomalloc.h"
-#include "bomalloc_sync.h"
-#include "bomalloc_utils.h"
+#include "ipa.h"
+#include "ipa_sync.h"
+#include "ipa_utils.h"
 #include "memmap.h"
 
 extern size_t my_growth;
@@ -23,7 +23,7 @@ void beginspec() {
   // void * end_ds = sbrk(0);
   // printf("sbrk pre-spec 0x%p\n", end_ds);
   my_growth = 0;
-  bomalloc_init();
+  ipa_init();
   shared->spec_base = sbrk(0);
   map_missing_pages();
   synch_lists();
@@ -59,7 +59,7 @@ static inline void set_large_perm(int flags) {
       data = *block;
       fsync(fd);
       if (!mmap((void *) block, data.huge_block_sz, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0)) {
-        bomalloc_perror("Unable to reconfigure permissions.");
+        ipa_perror("Unable to reconfigure permissions.");
       }
       close(fd);
       block->is_shared = false;

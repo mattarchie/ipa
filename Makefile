@@ -2,7 +2,7 @@ ifneq ($(TRAVIS_CI), 1)
 	CC = gcc
 endif
 
-INCFLAGS = -I./ -I./bomalloc
+INCFLAGS = -I./ -I./ipa
 DEFS = -DCOLLECT_STATS -DBOMALLOC_SYSTEM_ALLOC -DNO_HOOK -DSUPPORT_THREADS -USUPPORT_THREADS -D_GNU_SOURCE
 OPT_FLAGS = -O2 -march=native
 DEBUG_FLAGS = -ggdb3 -g3
@@ -15,13 +15,13 @@ TEST_BINARIES = $(basename $(TEST_SOURCE))
 TEST_OBJECTS = $(patsubst %.c,%.o, $(TEST_SOURCE))
 DEP = $(SOURCE:.c=.d) $(TEST_SOURCE:.c=.d)
 
-OBJECTS = bomalloc.o memmap.o bomalloc_utils.o bomalloc_sync.o bomalloc_overrides.o file_io.o
+OBJECTS = ipa.o memmap.o ipa_utils.o ipa_sync.o ipa_overrides.o file_io.o
 LDFLAGS = -Wl,--no-as-needed -ldl -rdynamic -lm
-LIBRARY = libbomalloc.a
+LIBRARY = libipa.a
 
 default: $(LIBRARY)
 
-libbomalloc.a: $(OBJECTS)
+libipa.a: $(OBJECTS)
 	@echo Building library $@
 	@ar rcs $@ $?
 	@ranlib $@

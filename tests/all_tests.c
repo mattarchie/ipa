@@ -1,6 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include "bomalloc.h"
+#include "ipa.h"
 #include "dummy.h"
 #include "teardown.h"
 
@@ -35,8 +35,8 @@ int main() {
 
   for (rnd = 0; rnd < NUM_ROUNDS; rnd++) {
     alloc_size = uniform_size_class();
-    int * payload = bomalloc(alloc_size);
-    size_t usable = bomalloc_usable_space(payload);
+    int * payload = ipa_malloc(alloc_size);
+    size_t usable = ipa_usable_space(payload);
     assert(payload != NULL);
     assert(usable >= alloc_size);
     ptrs[rnd] = payload;
@@ -49,5 +49,5 @@ int main() {
     *payload = 42;
   }
   printf("Basic allocation test passed\n");
-  print_bomalloc_stats();
+  print_ipa_stats();
 }

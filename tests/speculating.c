@@ -6,8 +6,8 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <errno.h>
-#include "bomalloc.h"
-#include "bomalloc_utils.h"
+#include "ipa.h"
+#include "ipa_utils.h"
 
 int num_rounds = 200;
 int num_children = 4;
@@ -41,7 +41,7 @@ void __attribute__((noreturn)) child(const int id)  {
   assert(spec);
   // printf("child %d (pid %d) sbrk at start %p\n", id, getpid(), start_ds);
   for (size_t  rnd = PER_EACH * id; rnd < PER_EACH * (id + 1); rnd++) {
-    int * payload = bomalloc(alloc_size);
+    int * payload = ipa_malloc(alloc_size);
     *payload = 0xdeadbeef;
     printf("child %d Allocated %p\n", id, payload);
   }
@@ -95,6 +95,6 @@ int main(int argc, char ** argv) {
   endspec(true);
   spec = false;
   printf("Spec allocation test finished!\n");
-  print_bomalloc_stats();
-  bomalloc_teardown();
+  print_ipa_stats();
+  ipa_teardown();
 }

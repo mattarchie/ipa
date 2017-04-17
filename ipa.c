@@ -11,10 +11,10 @@
 #include <unistd.h>
 #include <signal.h>
 
-#include "bomalloc.h"
+#include "ipa.h"
 #include "memmap.h"
 #include "stack.h"
-#include "bomalloc_utils.h"
+#include "ipa_utils.h"
 #include "timing.h"
 
 
@@ -24,8 +24,8 @@ volatile size_t my_growth;
 
 extern header_page_t * seq_headers;
 
-static bomalloc_stack_t delayed_frees_unclaimable[NUM_CLASSES] = {0};
-static bomalloc_stack_t delayed_frees_reclaimable[NUM_CLASSES] = {0};
+static ipa_stack_t delayed_frees_unclaimable[NUM_CLASSES] = {0};
+static ipa_stack_t delayed_frees_reclaimable[NUM_CLASSES] = {0};
 
 //prototypes
 void * inc_heap(intptr_t);
@@ -79,7 +79,7 @@ static inline volatile header_t * alloc_pop(size_t size) {
   }
 }
 
-size_t bomalloc_usable_space(void * payload) {
+size_t ipa_usable_space(void * payload) {
   if (payload == NULL) {
     return 0;
   } else if (out_of_range(payload)) {
@@ -93,9 +93,9 @@ static void map_headers(char * begin, size_t index, size_t num_blocks) {
   size_t i, header_index = -1;
   volatile header_page_t * page;
   size_t block_size = CLASS_TO_SIZE(index);
-  volatile bomalloc_stack_t * seq_stack = &shared->seq_free[index];
-  // volatile bomalloc_stack_t * spec_stack = &shared->spec_free[index];
-  bomalloc_stack_t * local_stack = &delayed_frees_reclaimable[index];
+  volatile ipa_stack_t * seq_stack = &shared->seq_free[index];
+  // volatile ipa_stack_t * spec_stack = &shared->spec_free[index];
+  ipa_stack_t * local_stack = &delayed_frees_reclaimable[index];
   volatile block_t * block;
   assert(block_size == ALIGN(block_size));
   volatile header_t * header = NULL;
@@ -150,7 +150,7 @@ static void map_headers(char * begin, size_t index, size_t num_blocks) {
   }
 }
 
-void bomalloc_init() {
+void ipa_init() {
   if (shared == NULL) {
     shared = mmap(NULL,
               MAX(sizeof(shared_data_t), PAGE_SIZE),
@@ -205,7 +205,7 @@ void * inc_heap(intptr_t s) {
   stats_collect(&shared->total_alloc, s);
   void * x = sbrk(s);
   if (x == (void *) -1) {
-    bomalloc_perror("Unable to extend data segment");
+    ipa_perror("Unable to extend data segment");
     abort();
   }
   end_ds = sbrk(0);
@@ -223,11 +223,11 @@ size_t stack_for_size(size_t min_size) {
   return CLASS_TO_SIZE(klass);
 }
 
-void * bomalloc(size_t size) {
+void * ipa_malloc(size_t size) {
   volatile header_t * header;
   size_t aligned = ALIGN(size + sizeof(block_t));
   if (shared == NULL) {
-    bomalloc_init();
+    ipa_init();
   }
 #ifdef COLLECT_STATS
   stats_collect(&shared->allocations, 1);
@@ -240,7 +240,7 @@ void * bomalloc(size_t size) {
     if (block != NULL) {
       record_allocation(block, block->huge_block_sz);
     } else {
-      bomalloc_perror("Unable to allocate large user payload");
+      ipa_perror("Unable to allocate large user payload");
       return NULL;
     }
     return gethugepayload(block);
@@ -297,17 +297,17 @@ void bofree(void * payload) {
     if (!speculating()) {
       huge_block_t * block = gethugeblock(payload);
       if (munmap(block, block->huge_block_sz) == -1) {
-        bomalloc_perror("Unable to unmap block");
+        ipa_perror("Unable to unmap block");
       }
     }
   } else if (!speculating()) {
     // Not speculating -- free now
-    volatile bomalloc_stack_t * stack = &shared->seq_free[SIZE_TO_CLASS(header->size)];
+    volatile ipa_stack_t * stack = &shared->seq_free[SIZE_TO_CLASS(header->size)];
     record_mode_free(header);
     push(stack, &header->seq_next);
   } else if (header->allocator == getpid()) {
     // This is reclaimable
-    size_t index = SIZE_TO_CLASS(bomalloc_usable_space(payload));
+    size_t index = SIZE_TO_CLASS(ipa_usable_space(payload));
     push_ageless(&delayed_frees_reclaimable[index], (node_t *) &header->spec_next);
   } else {
     /**
@@ -316,7 +316,7 @@ void bofree(void * payload) {
      * If it was originally allocated sequentially (eg. before starting spec)
      * 	then spec_next was unused -- no need to keep around
      */
-    size_t index = SIZE_TO_CLASS(bomalloc_usable_space(payload));
+    size_t index = SIZE_TO_CLASS(ipa_usable_space(payload));
     push_ageless(&delayed_frees_unclaimable[index], (node_t*) &getblock(payload)->header->spec_next);
   }
 }
@@ -327,31 +327,31 @@ void free_delayed() {
     while (!empty(&delayed_frees_unclaimable[index])) {
       volatile node_t * node = pop_ageless(&delayed_frees_unclaimable[index]);
       volatile header_t * head = container_of(node, volatile header_t, spec_next);
-      push_ageless((bomalloc_stack_t *) &shared->seq_free[index], (node_t *)  &head->seq_next);
+      push_ageless((ipa_stack_t *) &shared->seq_free[index], (node_t *)  &head->seq_next);
     }
     while (!empty(&delayed_frees_reclaimable[index])) {
       volatile node_t * node = pop_ageless(&delayed_frees_reclaimable[index]);
       volatile header_t * head = container_of(node, volatile header_t, spec_next);
-      push_ageless((bomalloc_stack_t *) &shared->seq_free[index], (node_t *) &head->seq_next);
+      push_ageless((ipa_stack_t *) &shared->seq_free[index], (node_t *) &head->seq_next);
     }
   }
 }
 
 void * bocalloc(size_t nmemb, size_t size) {
-  void * payload = bomalloc(nmemb * size);
+  void * payload = ipa_malloc(nmemb * size);
   if (payload != NULL) {
-    memset(payload, 0, bomalloc_usable_space(payload));
+    memset(payload, 0, ipa_usable_space(payload));
   }
   return payload;
 }
 
 
 void * borealloc(void * p, size_t size) {
-  size_t original_size = bomalloc_usable_space(p);
+  size_t original_size = ipa_usable_space(p);
   if (original_size >= size) {
     return p;
   } else {
-    void * new_payload = bomalloc(size);
+    void * new_payload = ipa_malloc(size);
     memcpy(new_payload, p, original_size);
     bofree(p);
     return new_payload;

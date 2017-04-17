@@ -5,7 +5,7 @@
 #include <math.h>
 #include <assert.h>
 
-#include "bomalloc_hooks.h"
+#include "ipa_hooks.h"
 #include "stack.h"
 
 #if __WORDSIZE == 64
@@ -70,12 +70,12 @@ static inline const size_t class_for_size(size_t x) {
 typedef struct {
   union {
     struct {
-      volatile struct bomalloc_page_t * next_page;
+      volatile struct ipa_page_t * next_page;
       volatile int next_pg_name;
     };
     combined_page_t combined;
   };
-} bomalloc_page_t;
+} ipa_page_t;
 
 typedef union {
 #ifdef BOMALLOC_ALIGN_HEADERS
@@ -110,11 +110,11 @@ typedef union {
 #define PAGES_PER_HPG 5
 #endif
 #define HEADERS_PER_PAGE ((( PAGES_PER_HPG * PAGE_SIZE) - \
-                          (sizeof(size_t) + sizeof(void*) + sizeof(bomalloc_page_t))) / sizeof(header_t) \
+                          (sizeof(size_t) + sizeof(void*) + sizeof(ipa_page_t))) / sizeof(header_t) \
                           )
 
 typedef struct {
-  bomalloc_page_t next_page;
+  ipa_page_t next_page;
   volatile struct header_page_t * next_header;
   // unsigned number; // to be used used to help minimize the number of header pages?
   size_t next_free;
@@ -128,7 +128,7 @@ typedef struct {
 } block_t;
 
 typedef struct {
-  bomalloc_page_t next_page;
+  ipa_page_t next_page;
   volatile struct huge_block_t * next_block;
   size_t huge_block_sz; //Note: this includes the block_t space
   int file_name; // Might be able to eliminate this field
@@ -144,7 +144,7 @@ typedef volatile unsigned long stats_int_t __attribute__ ((aligned (64))); //64B
 
 // Allocated at the start of the program in shared mem.
 typedef struct {
-  bomalloc_page_t next_page;
+  ipa_page_t next_page;
 #ifdef COLLECT_STATS
   volatile stats_int_t allocations;
   volatile stats_int_t frees;
@@ -159,8 +159,8 @@ typedef struct {
   volatile stats_int_t number_mmap; // how many pages where mmaped (headers & large)
   volatile stats_int_t spec_sbrks;
 #endif
-  volatile bomalloc_stack_t seq_free[NUM_CLASSES]; // sequential free list
-  volatile bomalloc_stack_t spec_free[NUM_CLASSES]; // speculative free list
+  volatile ipa_stack_t seq_free[NUM_CLASSES]; // sequential free list
+  volatile ipa_stack_t spec_free[NUM_CLASSES]; // speculative free list
   volatile size_t base; //where segment begins (cache)
   volatile size_t spec_growth; // grow (B) done by spec group
   volatile void * spec_base;
@@ -182,7 +182,7 @@ extern shared_data_t * shared;
 
 // Function prototypes
 
-void bomalloc_init(void);
+void ipa_init(void);
 
 // Utility functions
 static inline block_t * getblock(void * user_payload) {
@@ -257,16 +257,16 @@ static inline volatile header_t * seq_node_to_header(volatile node_t * node) {
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
 #define MAX(a,b) ((a) > (b) ? (a) : (b))
 
-void * bomalloc(size_t);
+void * ipa_malloc(size_t);
 void * bocalloc(size_t, size_t);
 void * borealloc(void *, size_t);
 void bofree(void *);
-size_t bomalloc_usable_space(void *);
+size_t ipa_usable_space(void *);
 
 void beginspec(void);
 void endspec(bool);
 
 void record_allocation(void *, size_t);
 
-void bomalloc_teardown(void);
+void ipa_teardown(void);
 #endif

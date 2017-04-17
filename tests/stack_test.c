@@ -18,7 +18,7 @@ int main() {
   const int elements = 5;
   int index, errors = 0;
   volatile node_t * empty_stack;
-  bomalloc_stack_t * stack = new_stack();
+  ipa_stack_t * stack = new_stack();
 
   for (index = 0; index < elements; index++) {
     push(stack, (node_t *) alloc_node(index));

@@ -11,7 +11,7 @@ void free_delayed(void);
 static inline void set_large_perm();
 
 extern void * inc_heap(size_t);
-extern void bomalloc_init(void);
+extern void ipa_init(void);
 
 
 #endif

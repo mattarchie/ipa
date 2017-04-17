@@ -22,7 +22,7 @@ data_node_t * alloc_node(int data) {
 
 bool elements_found[elements] = {false};
 bool errored = false;
-bomalloc_stack_t stack;
+ipa_stack_t stack;
 
 void * worker_thread(void * id_ptr) {
   int id = * (int *) id_ptr;
