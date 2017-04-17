@@ -285,7 +285,7 @@ void * ipa_malloc(size_t size) {
   }
 }
 
-void bofree(void * payload) {
+void ipafree(void * payload) {
   stats_collect(&shared->frees, 1);
   if (payload == NULL) {
     return;
@@ -339,7 +339,7 @@ void free_delayed() {
   }
 }
 
-void * bocalloc(size_t nmemb, size_t size) {
+void * ipacalloc(size_t nmemb, size_t size) {
   void * payload = ipa_malloc(nmemb * size);
   if (payload != NULL) {
     memset(payload, 0, ipa_usable_space(payload));
@@ -348,14 +348,14 @@ void * bocalloc(size_t nmemb, size_t size) {
 }
 
 
-void * borealloc(void * p, size_t size) {
+void * iparealloc(void * p, size_t size) {
   size_t original_size = ipa_usable_space(p);
   if (original_size >= size) {
     return p;
   } else {
     void * new_payload = ipa_malloc(size);
     memcpy(new_payload, p, original_size);
-    bofree(p);
+    ipafree(p);
     return new_payload;
   }
 }

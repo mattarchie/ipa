@@ -8,7 +8,7 @@ int main() {
   int * payload = ipa_malloc(sizeof(int));
   printf("ipa payload %p\n", payload);
   *payload = 42;
-  bofree(payload);
+  ipafree(payload);
   printf("Basic free test passed\n");
   return 0;
 }

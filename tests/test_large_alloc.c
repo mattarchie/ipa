@@ -9,7 +9,7 @@ int main() {
   printf("ipa payload %p\n", payload);
   *payload = 42;
   printf("Large allocation passed\n");
-  bofree(payload);
+  ipafree(payload);
   printf("Successfully freed large block\n");
   print_ipa_stats();
   return 0;

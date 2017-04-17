@@ -264,9 +264,9 @@ static inline volatile header_t * seq_node_to_header(volatile node_t * node) {
 #define MAX(a,b) ((a) > (b) ? (a) : (b))
 
 void * ipa_malloc(size_t);
-void * bocalloc(size_t, size_t);
-void * borealloc(void *, size_t);
-void bofree(void *);
+void * ipacalloc(size_t, size_t);
+void * iparealloc(void *, size_t);
+void ipafree(void *);
 size_t ipa_usable_space(void *);
 
 void beginspec(void);
