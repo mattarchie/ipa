@@ -57,9 +57,10 @@ void print_ipa_stats() {
   for (index = 0; index < NUM_CLASSES; index++) {
     printf("class %2d (%'10lu B) allocations: %lu\n", index, CLASS_TO_SIZE(index), snapshot.allocs_per_class[index]);
   }
-  printf("Total managed memory:\n\t%'lu B\n\t%'.0lf pages\n\t%'.2lf GB\n\t%'.2lf TB\n",
+  printf("Total managed memory:\n\t%'lu B\n\t%'.0lf pages\n\t%'lu frames\n\t%'.2lf GB\n\t%'.2lf TB\n",
           (size_t) snapshot.total_alloc,
           ceil(((double) snapshot.total_alloc) / PAGE_SIZE),
+          snapshot.total_frames,
           ((double) snapshot.total_alloc) / (1024L * 1024 * 1024),
 #if __WORDSIZE == 64
           ((double) shared->total_alloc) / (1024L * 1024 * 1024 * 1024)

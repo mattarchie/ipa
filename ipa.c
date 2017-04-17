@@ -158,6 +158,7 @@ void ipa_init() {
     bzero(shared, PAGE_SIZE);
     shared->number_mmap = ceil(((double) sizeof(shared_data_t)) / PAGE_SIZE);
     shared->base = (size_t) sbrk(0); // get the starting address
+    stats_collect(&shared->total_frames, ceil(((double) sizeof(shared_data_t) / PAGE_SIZE)));
 #ifdef COLLECT_STATS
     shared->total_alloc = MAX(sizeof(shared_data_t), PAGE_SIZE);
 #endif
@@ -198,6 +199,7 @@ static void grow(size_t aligned) {
   // now map headers for my new (private) address region
   map_headers(base, index, blocks);
   stats_collect(&shared->total_blocks, blocks);
+  stats_collect(&shared->total_frames, ceil(((double) my_region_size) / PAGE_SIZE));
 }
 
 void * inc_heap(intptr_t s) {

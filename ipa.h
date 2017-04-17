@@ -158,6 +158,7 @@ typedef struct {
   volatile stats_int_t num_unmaps;
   volatile stats_int_t number_mmap; // how many pages where mmaped (headers & large)
   volatile stats_int_t spec_sbrks;
+  volatile stats_int_t total_frames; //estimate of the total number of frames used
 #endif
   volatile ipa_stack_t seq_free[NUM_CLASSES]; // sequential free list
   volatile ipa_stack_t spec_free[NUM_CLASSES]; // speculative free list

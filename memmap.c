@@ -13,6 +13,7 @@
 #include <sys/resource.h>
 #include <errno.h>
 #include <signal.h>
+#include <math.h>
 
 #include "ipa.h"
 #include "memmap.h"
@@ -217,6 +218,7 @@ static inline ipa_page_t * allocate_ipa_page(int file_no, size_t minsize, int fl
     }
   }
   stats_collect(&shared->total_alloc, allocation_size);
+  stats_collect(&shared->total_frames, ceil(((double) allocation_size) / PAGE_SIZE));
   stats_collect(&shared->number_mmap, 1);
   return allocation;
 }
