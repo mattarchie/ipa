@@ -114,7 +114,6 @@ static inline volatile ipa_page_t * map_missing_pages_safe(bool faulting) {
   static volatile ipa_page_t * cache = NULL;
   volatile ipa_page_t * start = cache == NULL ? &shared->next_page : cache;
   volatile ipa_page_t * last_page = start;
-  volatile ipa_page_t * prev __attribute__((unused)) = NULL;
   // These are for debugging, volatile so they can't be removed by compiler
   volatile int rounds = 0, maps = 0;
   if (start->next_page != NULL) {
@@ -123,7 +122,7 @@ static inline volatile ipa_page_t * map_missing_pages_safe(bool faulting) {
       map_now(start);
       assert(is_mapped((void *)  start->next_page));
     }
-    for (last_page = start; last_page->next_page != NULL; prev = last_page,  last_page = (volatile ipa_page_t *) last_page->next_page) {
+    for (last_page = start; last_page->next_page != NULL; last_page = (volatile ipa_page_t *) last_page->next_page) {
       rounds++;
       if (!full_map_check(faulting, last_page)) {
         maps++;
