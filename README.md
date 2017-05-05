@@ -3,7 +3,7 @@ ipa - Inter-Process Allocator
 
 (c) Benjamin O'Halloran
 
-[![Build Status](https://travis-ci.org/benohalloran/bomalloc.svg?branch=master)](https://travis-ci.org/benohalloran/bomalloc)
+[![Build Status](https://travis-ci.org/benohalloran/ipa.svg?branch=master)](https://travis-ci.org/benohalloran/ipa)
 
 # About
 
