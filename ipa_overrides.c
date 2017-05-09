@@ -1,6 +1,6 @@
 #include "ipa.h"
 
-#ifdef BOMALLOC_SYSTEM_ALLOC
+#ifdef IPA_SYSTEM_ALLOC
 #if defined(__GNUC__) && !defined(NO_HOOK)
 #include <malloc.h>
 
