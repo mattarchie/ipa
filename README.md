@@ -19,3 +19,5 @@ speculating and synchronizing this growth in order to avoid artificial conflicts
 
 This allocator has previously been called 'noomr' and 'bomalloc' on Github. 
 The current name (IPA) should be the final one.
+
+![Genesee IPA](http://www.geneseebeer.com/images/details/logos/ipa.svg)
