@@ -130,13 +130,13 @@ static void map_headers(char * begin, size_t index, size_t num_blocks) {
     // mmaped pages are padded with zeros, set NULL anyways
     header->spec_next.next = NULL;
     header->seq_next.next = NULL;
-    header->payload = getpayload(block);
+    header->payload = m_getpayload(block);
 
     block->header = (header_t * ) header;
     // (in)sanity checks
-    assert(getblock(getpayload(block)) == block);
-    assert(getblock(getpayload(block))->header == header);
-    assert(payload(header) == getpayload(block));
+    assert(getblock(m_getpayload(block)) == block);
+    assert(getblock(m_getpayload(block))->header == header);
+    assert(payload(header) == m_getpayload(block));
 
     if (am_spec) {
       push_ageless(local_stack, (node_t *) &header->spec_next);

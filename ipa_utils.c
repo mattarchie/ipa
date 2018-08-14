@@ -1,5 +1,6 @@
 #undef _POSIX_C_SOURCE
 #define _POSIX_C_SOURCE 200112
+#undef _GNU_SOURCE
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -80,7 +81,7 @@ void ipa_teardown() {
   int written;
   bool no_errors = true;
   // ensure the directory is present
-  for (int i = 1; i <= shared->next_name; i++) {
+  for (int i = 2; i <= shared->next_name; i++) {
     written = snprintf(&path[0], sizeof(path), "%s%d/%d", "/tmp/bop/", getuniqueid(), i);
     if (written > sizeof(path) || written < 0) {
       ipa_perror("Unable to write directory name for cleanup");
